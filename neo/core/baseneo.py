@@ -250,9 +250,9 @@ class BaseNeo(object):
     # Attributes that an instance is requires to have defined
     _necessary_attrs = ()
     # Attributes that an instance may or may have defined
-    _recommended_attrs = (('name', str),
-                          ('description', str),
-                          ('file_origin', str))
+    _recommended_attrs = (('name', basestring),
+                          ('description', basestring),
+                          ('file_origin', basestring))
     # Attributes that are used for pretty-printing
     _repr_pretty_attrs_keys_ = ("name", "description", "annotations")
 

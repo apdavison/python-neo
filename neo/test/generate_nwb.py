@@ -10,7 +10,7 @@ import neo
 from quantities import mV, ms, kHz, s, nA
 
 blocks = [neo.Block(name="block1",
-                    file_datetime=datetime.now(),
+                    rec_datetime=datetime.now(),
                     index=1234,
                     foo="bar"),
           ]
@@ -46,3 +46,5 @@ for j, segment in enumerate(segments0):
 io = neo.io.NWBIO("neo_nwb_example1.nwb")
 io.write_block(blocks[0])
 
+io = neo.io.NWBIO("neo_nwb_example1.nwb")
+block = io.read_block()
