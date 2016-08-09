@@ -14,13 +14,6 @@ from numbers import Number
 
 import numpy as np
 
-ALLOWED_ANNOTATION_TYPES = (int, float, complex,
-                            str, bytes,
-                            type(None),
-                            datetime, date, time, timedelta,
-                            Number, Decimal,
-                            np.number, np.bool_)
-
 # handle both Python 2 and Python 3
 try:
     ALLOWED_ANNOTATION_TYPES += (long, unicode)
@@ -31,6 +24,13 @@ try:
     basestring
 except NameError:
     basestring = str
+
+ALLOWED_ANNOTATION_TYPES = (int, float, complex,
+                            basestring, bytes,
+                            type(None),
+                            datetime, date, time, timedelta,
+                            Number, Decimal,
+                            np.number, np.bool_)
 
 logger = logging.getLogger("Neo")
 

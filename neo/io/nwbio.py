@@ -87,7 +87,8 @@ class NWBIO(BaseIO):
     is_streameable = False
     #supported_objects = [Block, Segment, AnalogSignal, IrregularlySampledSignal,
     #                     SpikeTrain, Epoch, Event, ChannelIndex, Unit]
-    supported_objects = [Block, Segment, AnalogSignal, IrregularlySampledSignal]
+    supported_objects = [Block, Segment, AnalogSignal, IrregularlySampledSignal,
+                         SpikeTrain, Event]
     readable_objects  = supported_objects
     writeable_objects = supported_objects
 
@@ -189,7 +190,7 @@ class NWBIO(BaseIO):
         # todo: handle epochs.attrs.get('tags')
         for name, epoch in epochs.items():
             # todo: handle epoch.attrs.get('links')
-            signals = []
+            timeseries = []
             for key, value in epoch.items():
                 if key == 'start_time':
                     t_start = value * pq.second
@@ -198,56 +199,71 @@ class NWBIO(BaseIO):
                 else:
                     # todo: handle value['count']
                     # todo: handle value['idx_start']
-                    signals.append(self._handle_timeseries(key, value.get('timeseries')))
+                    timeseries.append(self._handle_timeseries(key, value.get('timeseries')))
             segment = Segment(name=name)
-            for signal in signals:
-                signal.segment = segment
-                if isinstance(signal, AnalogSignal):
-                    segment.analogsignals.append(signal)
-                elif isinstance(signal, IrregularlySampledSignal):
-                    segment.irregularlysampledsignals.append(signal)
+            for obj in timeseries:
+                obj.segment = segment
+                if isinstance(obj, AnalogSignal):
+                    segment.analogsignals.append(obj)
+                elif isinstance(obj, IrregularlySampledSignal):
+                    segment.irregularlysampledsignals.append(obj)
+                elif isinstance(obj, Event):
+                    segment.events.append(obj)
             segment.block = block
             block.segments.append(segment)
 
     def _handle_timeseries(self, name, timeseries):
         # todo: check timeseries.attrs.get('schema_id')
         # todo: handle timeseries.attrs.get('source')
+        subtype = timeseries.attrs['ancestry'][-1]
+
         data_group = timeseries.get('data')
+        dtype = data_group.dtype
         if self._lazy:
-            data = np.array(())
+            data = np.array((), dtype=dtype)
             lazy_shape = data_group.value.shape  # inefficient to load the data to get the shape
         else:
             data = data_group.value
 
-        units = get_units(data_group)
-        if 'starting_time' in timeseries:
-            # AnalogSignal
-            sampling_metadata = timeseries.get('starting_time')
-            t_start = sampling_metadata.value * pq.s
-            sampling_rate = sampling_metadata.attrs.get('rate') * pq.Hz
-            assert sampling_metadata.attrs.get('unit') == 'Seconds'
-            # todo: handle data.attrs['resolution']
-            signal = AnalogSignal(data,
-                                  units=units,
-                                  sampling_rate=sampling_rate,
-                                  t_start=t_start,
-                                  name=name)
-        elif 'timestamps' in timeseries:
-            # IrregularlySampledSignal
+        if dtype.type is np.string_:
+            # Event
             if self._lazy:
-                time_data = np.array(())
+                times = np.array(())
             else:
-                time_data = timeseries.get('timestamps')
-                assert time_data.attrs.get('unit') == 'Seconds'
-            signal = IrregularlySampledSignal(time_data.value,
-                                              data,
-                                              units=units,
-                                              time_units=pq.second)
+                times = timeseries.get('timestamps')
+            obj = Event(times=times,
+                        labels=data,
+                        units='second')
         else:
-            raise Exception("Timeseries group does not contain sufficient time information")
+            units = get_units(data_group)
+            if 'starting_time' in timeseries:
+                # AnalogSignal
+                sampling_metadata = timeseries.get('starting_time')
+                t_start = sampling_metadata.value * pq.s
+                sampling_rate = sampling_metadata.attrs.get('rate') * pq.Hz
+                assert sampling_metadata.attrs.get('unit') == 'Seconds'
+                # todo: handle data.attrs['resolution']
+                obj = AnalogSignal(data,
+                                   units=units,
+                                   sampling_rate=sampling_rate,
+                                   t_start=t_start,
+                                   name=name)
+            elif 'timestamps' in timeseries:
+                # IrregularlySampledSignal
+                if self._lazy:
+                    time_data = np.array(())
+                else:
+                    time_data = timeseries.get('timestamps')
+                    assert time_data.attrs.get('unit') == 'Seconds'
+                obj = IrregularlySampledSignal(time_data.value,
+                                               data,
+                                               units=units,
+                                               time_units=pq.second)
+            else:
+                raise Exception("Timeseries group does not contain sufficient time information")
         if self._lazy:
-            signal.lazy_shape = lazy_shape
-        return signal
+            obj.lazy_shape = lazy_shape
+        return obj
 
     def _handle_acquisition_group(self, block):
         acq = self._file.get('acquisition')
@@ -262,7 +278,28 @@ class NWBIO(BaseIO):
         block.annotations['file_read_log'] += ("stimulus group not handled\n")
 
     def _handle_processing_group(self, block):
-        block.annotations['file_read_log'] += ("processing group not handled\n")
+        # todo: handle other modules than Units
+        units_group = self._file.get('processing/Units/UnitTimes')
+        segment_map = dict((segment.name, segment) for segment in block.segments)
+        for name, group in units_group.items():
+            if name == 'unit_list':
+                pass  # todo
+            else:
+                segment_name = group['source'].value
+                #desc = group['unit_description'].value  # use this to store Neo Unit id?
+                segment = segment_map[segment_name]
+                if self._lazy:
+                    times = np.array(())
+                    lazy_shape = group['times'].shape
+                else:
+                    times = group['times'].value
+                spiketrain = SpikeTrain(times, units=pq.second,
+                                        t_stop=group['t_stop'].value*pq.second)  # todo: this is a custom Neo value, general NWB files will not have this - use segment.t_stop instead in that case?
+                if self._lazy:
+                    spiketrain.lazy_shape = lazy_shape
+                spiketrain.segment = segment
+                segment.spiketrains.append(spiketrain)
+
 
     def _handle_analysis_group(self, block):
         block.annotations['file_read_log'] += ("analysis group not handled\n")
@@ -274,10 +311,9 @@ class NWBIO(BaseIO):
                                        time_in_seconds(segment.t_stop))
         for i, signal in enumerate(chain(segment.analogsignals, segment.irregularlysampledsignals)):
             self._write_signal(signal, epoch, i)
-        for spiketrain in segment.spiketrains:
-            pass
-        for event in segment.events:
-            pass
+        self._write_spiketrains(segment.spiketrains, segment)
+        for i, event in enumerate(segment.events):
+            self._write_event(event, epoch, i)
         for neo_epoch in segment.epochs:
             pass
 
@@ -317,6 +353,41 @@ class NWBIO(BaseIO):
                                time_in_seconds(signal.segment.t_start),
                                time_in_seconds(signal.segment.t_stop),
                                signal_name,
+                               ts)
+
+    def _write_spiketrains(self, spiketrains, segment):
+        mod = self._file.make_group("<Module>", "Units", abort=False)
+        #mod.set_custom_dataset('description', 'Spike times and waveforms')
+        # create interfaces
+        #spk_waves_iface = mod.make_group("EventWaveform")
+        #spk_waves_iface.set_attr("source", "Data as reported in Nuo's file")
+        spiketrain_group = mod.make_group("UnitTimes", abort=False)
+        spiketrain_group.set_attr("source", "block {0}".format(segment.block.name))
+        fmt = 'unit_{{0:0{0}d}}_{1}'.format(len(str(len(spiketrains))), segment.name)
+        for i, spiketrain in enumerate(spiketrains):
+            unit = fmt.format(i)
+            ug = spiketrain_group.make_group("<unit_N>", unit)
+            ug.set_dataset("times", spiketrain.rescale('second').magnitude)
+            ug.set_dataset("source", segment.name)
+            ug.set_dataset("unit_description", "unit description goes here")
+            ug.set_custom_dataset("t_stop", spiketrain.t_stop.rescale('second').magnitude)
+            # spk_times_iface.append_unit_data(unit, "trial_ids", trial_ids)
+            #ug.set_custom_dataset("trial_ids", trial_ids)
+
+    def _write_event(self, event, nwb_epoch, i):
+        event_name = event.name or "event{0}".format(i)
+        ts_name = "{0}_{1}".format(event.segment.name, event_name)
+        ts = self._file.make_group("<AnnotationSeries>", ts_name, path="/acquisition/timeseries")
+        ts.set_dataset("timestamps", event.times.rescale('second').magnitude)
+        ts.set_dataset("data", event.labels)
+        ts.set_dataset("num_samples", event.size)   # this is supposed to be created automatically, but is not
+        #ts.set_dataset("num_channels", signal.shape[1])
+        ts.set_attr("source", event.name or "unknown")
+        ts.set_attr("description", event.description or "")
+        nwb_utils.add_epoch_ts(nwb_epoch,
+                               time_in_seconds(event.segment.t_start),
+                               time_in_seconds(event.segment.t_stop),
+                               event_name,
                                ts)
 
 
