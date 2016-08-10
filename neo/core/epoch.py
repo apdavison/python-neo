@@ -92,6 +92,9 @@ class Epoch(BaseNeo, pq.Quantity):
                        (units, dim.simplified))
 
         obj = pq.Quantity.__new__(cls, times, units=dim)
+        # if units of `durations` not given, use the same units as `times`
+        if not isinstance(durations, pq.Quantity):
+            durations = pq.Quantity(durations, units=units)
         obj.durations = durations
         obj.labels = labels
         obj.segment = None

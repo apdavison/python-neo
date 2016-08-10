@@ -61,6 +61,30 @@ neo_extension = {"fs": {"neo": {
                 "description": ("Multiple measurements are recorded at each point of time."),
                 "dimensions": ["num_times", "num_channels"],
                 "data_type": "float32"},
+        },
+
+        "<AnnotatedIntervalSeries>/": {
+            "description": "Represents a series of annotated time intervals",
+            "merge": ["core:<AnnotationSeries>/"],
+            "attributes": {
+                "ancestry": {
+                    "data_type": "text",
+                    "dimensions": ["3"],
+                    "value": ["TimeSeries", "AnnotationSeries", "AnnotatedIntervalSeries"],
+                    "const": True},
+                "help": {
+                    "data_type": "text",
+                    "value": "A series of annotated time intervals",
+                    "const": True}},
+            "durations": {
+                "description": ("Durations for intervals whose start times are stored in timestamps."),
+                "data_type": "float64!",
+                "dimensions": ["num_times"],
+                "attributes": {
+                    "unit": {
+                        "description": ("The string \"Seconds\""),
+                        "data_type": "text", "value": "Seconds"}}
+            },
         }
     }
 }}}
@@ -88,7 +112,7 @@ class NWBIO(BaseIO):
     #supported_objects = [Block, Segment, AnalogSignal, IrregularlySampledSignal,
     #                     SpikeTrain, Epoch, Event, ChannelIndex, Unit]
     supported_objects = [Block, Segment, AnalogSignal, IrregularlySampledSignal,
-                         SpikeTrain, Event]
+                         SpikeTrain, Epoch, Event]
     readable_objects  = supported_objects
     writeable_objects = supported_objects
 
@@ -209,6 +233,8 @@ class NWBIO(BaseIO):
                     segment.irregularlysampledsignals.append(obj)
                 elif isinstance(obj, Event):
                     segment.events.append(obj)
+                elif isinstance(obj, Epoch):
+                    segment.epochs.append(obj)
             segment.block = block
             block.segments.append(segment)
 
@@ -226,14 +252,24 @@ class NWBIO(BaseIO):
             data = data_group.value
 
         if dtype.type is np.string_:
-            # Event
             if self._lazy:
                 times = np.array(())
             else:
                 times = timeseries.get('timestamps')
-            obj = Event(times=times,
-                        labels=data,
-                        units='second')
+            durations = timeseries.get('durations')
+            if durations:
+                # Epoch
+                if self._lazy:
+                    durations = np.array(())
+                obj = Epoch(times=times,
+                            durations=durations,
+                            labels=data,
+                            units='second')
+            else:
+                # Event
+                obj = Event(times=times,
+                            labels=data,
+                            units='second')
         else:
             units = get_units(data_group)
             if 'starting_time' in timeseries:
@@ -306,16 +342,16 @@ class NWBIO(BaseIO):
 
     def _write_segment(self, segment):
         # Note that an NWB Epoch corresponds to a Neo Segment, not to a Neo Epoch.
-        epoch = nwb_utils.create_epoch(self._file, segment.name,
-                                       time_in_seconds(segment.t_start),
-                                       time_in_seconds(segment.t_stop))
+        nwb_epoch = nwb_utils.create_epoch(self._file, segment.name,
+                                           time_in_seconds(segment.t_start),
+                                           time_in_seconds(segment.t_stop))
         for i, signal in enumerate(chain(segment.analogsignals, segment.irregularlysampledsignals)):
-            self._write_signal(signal, epoch, i)
+            self._write_signal(signal, nwb_epoch, i)
         self._write_spiketrains(segment.spiketrains, segment)
         for i, event in enumerate(segment.events):
-            self._write_event(event, epoch, i)
-        for neo_epoch in segment.epochs:
-            pass
+            self._write_event(event, nwb_epoch, i)
+        for i, neo_epoch in enumerate(segment.epochs):
+            self._write_neo_epoch(neo_epoch, nwb_epoch, i)
 
     def _write_signal(self, signal, epoch, i):
         # for now, we assume that all signals should go in /acquisition
@@ -381,13 +417,29 @@ class NWBIO(BaseIO):
         ts.set_dataset("timestamps", event.times.rescale('second').magnitude)
         ts.set_dataset("data", event.labels)
         ts.set_dataset("num_samples", event.size)   # this is supposed to be created automatically, but is not
-        #ts.set_dataset("num_channels", signal.shape[1])
         ts.set_attr("source", event.name or "unknown")
         ts.set_attr("description", event.description or "")
         nwb_utils.add_epoch_ts(nwb_epoch,
                                time_in_seconds(event.segment.t_start),
                                time_in_seconds(event.segment.t_stop),
                                event_name,
+                               ts)
+
+    def _write_neo_epoch(self, neo_epoch, nwb_epoch, i):
+        neo_epoch_name = neo_epoch.name or "intervalseries{0}".format(i)
+        ts_name = "{0}_{1}".format(neo_epoch.segment.name, neo_epoch_name)
+        ts = self._file.make_group("<AnnotatedIntervalSeries>", ts_name,
+                                   path="/acquisition/timeseries")
+        ts.set_dataset("timestamps", neo_epoch.times.rescale('second').magnitude)
+        ts.set_dataset("durations", neo_epoch.durations.rescale('second').magnitude)
+        ts.set_dataset("data", neo_epoch.labels)
+        #ts.set_dataset("num_samples", neo_epoch.size)   # this is supposed to be created automatically, but is not
+        ts.set_attr("source", neo_epoch.name or "unknown")
+        ts.set_attr("description", neo_epoch.description or "")
+        nwb_utils.add_epoch_ts(nwb_epoch,
+                               time_in_seconds(neo_epoch.segment.t_start),
+                               time_in_seconds(neo_epoch.segment.t_stop),
+                               neo_epoch_name,
                                ts)
 
 
