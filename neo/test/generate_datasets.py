@@ -5,7 +5,10 @@ Generate datasets for testing
 
 # needed for python 3 compatibility
 from __future__ import absolute_import
-
+try:
+    basestring
+except NameError:
+    basestring = str
 from datetime import datetime
 
 import numpy as np
@@ -174,7 +177,7 @@ def get_fake_value(name, datatype, dim=0, dtype='float', seed=None,
         obj = obj.__name__
 
     if (name in ['name', 'file_origin', 'description'] and
-            (datatype != str or dim)):
+            (not issubclass(datatype, basestring) or dim)):
         raise ValueError('%s must be str, not a %sD %s' % (name, dim,
                                                            datatype))
 
@@ -188,7 +191,10 @@ def get_fake_value(name, datatype, dim=0, dtype='float', seed=None,
     if seed is not None:
         np.random.seed(seed)
 
-    if datatype == str:
+    if not isinstance(datatype, type):
+        raise ValueError("datatype must be a type object")
+
+    if issubclass(datatype, basestring):
         return str(np.random.randint(100000))
     if datatype == int:
         return np.random.randint(100)

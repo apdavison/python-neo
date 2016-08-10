@@ -537,8 +537,8 @@ class Test__get_fake_values(unittest.TestCase):
         self.assertEqual(sorted(attrnames), sorted(res1.keys()))
         self.assertEqual(sorted(attrannnames), sorted(res2.keys()))
 
-        items11 = [(name, type(value)) for name, value in res1.items()]
-        self.assertEqual(sorted(attritems), sorted(items11))
+        for name, expected_type in attritems:
+            assert isinstance(res1[name], expected_type)
         for name, value in res1.items():
             try:
                 self.assertEqual(res2[name], value)

@@ -8,7 +8,7 @@ python:
 install:
   - pip install -r requirements.txt
   - pip install coveralls
-  - pip install . 
+  - pip install .
 # command to run tests, e.g. python setup.py test
 script:
   nosetests --with-coverage --cover-package=neo
