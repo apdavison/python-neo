@@ -411,6 +411,7 @@ def fake_neo(obj_type="Block", cascade=True, seed=None, n=1):
             if (cascade == 'block' and len(child._parent_objects) > 0
                     and obj_type != child._parent_objects[-1]):
                 continue
+            #print("Adding {} to {} in {}".format(type(child), _container_name(childname), obj))
             getattr(obj, _container_name(childname)).append(child)
 
     # need to manually create 'implicit' connections

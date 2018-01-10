@@ -492,7 +492,6 @@ class TestSegment(unittest.TestCase):
         targ = self.targobj.analogsignals + self.targobj.spiketrains
         res = self.targobj.filter(objects=[AnalogSignal, SpikeTrain])
         assert_same_sub_schema(res, targ)
-        assert_same_sub_schema(res, targ)
 
     def test__filter_single_annotation_obj_single(self):
         targ = [self.epcs1a[1]]
