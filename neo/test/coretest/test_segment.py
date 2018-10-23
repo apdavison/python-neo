@@ -481,7 +481,7 @@ class TestSegment(unittest.TestCase):
         assert_same_sub_schema(res5, targ)
 
     def test__filter_no_annotation_but_object(self):
-        targ = self.targobj.spiketrains
+        targ = list(self.targobj.spiketrains)
         res = self.targobj.filter(objects=SpikeTrain)
         assert_same_sub_schema(res, targ)
 
@@ -489,7 +489,7 @@ class TestSegment(unittest.TestCase):
         res = self.targobj.filter(objects=AnalogSignal)
         assert_same_sub_schema(res, targ)
 
-        targ = self.targobj.analogsignals + self.targobj.spiketrains
+        targ = self.targobj.analogsignals + list(self.targobj.spiketrains)
         res = self.targobj.filter(objects=[AnalogSignal, SpikeTrain])
         assert_same_sub_schema(res, targ)
 
