@@ -23,6 +23,7 @@ else:
 from neo.core.block import Block
 from neo.core.container import filterdata
 from neo.core import SpikeTrain, Unit, AnalogSignal
+from neo.core.spiketrainlist import SpikeTrainList
 from neo.test.tools import (assert_neo_object_is_compliant,
                             assert_same_sub_schema)
 from neo.test.generate_datasets import (get_fake_value, get_fake_values,
@@ -403,7 +404,7 @@ class TestBlock(unittest.TestCase):
         assert_same_sub_schema(res4, targ)
 
     def test__filter_attribute_single(self):
-        targ = [self.trains1[0]]
+        targ = SpikeTrainList(items=[self.trains1[0]])
 
         name = self.trains1[0].name
         res0 = self.targobj.filter(name=name)
@@ -487,9 +488,9 @@ class TestBlock(unittest.TestCase):
         res1 = self.targobj.filter({'name': name, 'j': 90})
         res2 = self.targobj.filter(targdict={'name': name, 'j': 90})
 
-        assert_same_sub_schema(res0, targ)
-        assert_same_sub_schema(res1, targ)
-        assert_same_sub_schema(res2, targ)
+        assert_same_sub_schema(res0._items, targ)
+        assert_same_sub_schema(res1._items, targ)
+        assert_same_sub_schema(res2._items, targ)
 
     def test__filter_multi_partres_annotation_annotation(self):
         targ = self.trains1[::2]
@@ -498,16 +499,16 @@ class TestBlock(unittest.TestCase):
         res1 = self.targobj.filter({'j': 0}, i=0)
         res2 = self.targobj.filter([{'j': 0}], i=0)
 
-        assert_same_sub_schema(res0, targ)
-        assert_same_sub_schema(res1, targ)
-        assert_same_sub_schema(res2, targ)
+        assert_same_sub_schema(res0._items, targ)
+        assert_same_sub_schema(res1._items, targ)
+        assert_same_sub_schema(res2._items, targ)
 
     def test__filter_no_annotation_but_object(self):
         targ = []
         for seg in self.targobj.segments:
             targ.extend(seg.spiketrains)
         res = self.targobj.filter(objects=SpikeTrain)
-        assert_same_sub_schema(res, targ)
+        assert_same_sub_schema(res._items, targ)
 
         targ = []
         for seg in self.targobj.segments:
@@ -530,10 +531,10 @@ class TestBlock(unittest.TestCase):
         res2 = self.targobj.filter(j=1, objects=['SpikeTrain'])
         res3 = self.targobj.filter(j=1, objects=[SpikeTrain])
 
-        assert_same_sub_schema(res0, targ)
-        assert_same_sub_schema(res1, targ)
-        assert_same_sub_schema(res2, targ)
-        assert_same_sub_schema(res3, targ)
+        assert_same_sub_schema(res0._items, targ)
+        assert_same_sub_schema(res1._items, targ)
+        assert_same_sub_schema(res2._items, targ)
+        assert_same_sub_schema(res3._items, targ)
 
     def test__filter_single_annotation_norecur(self):
         targ = []
@@ -585,7 +586,7 @@ class TestBlock(unittest.TestCase):
     def test__filter_single_attribute_container_data(self):
         targ = [self.trains1[0]]
         res0 = self.targobj.filter(name=self.trains1[0].name, container=True)
-        assert_same_sub_schema(res0, targ)
+        assert_same_sub_schema(res0._items, targ)
 
     def test__filter_single_annotation_container_norecur(self):
         targ = [self.segs1[1], self.chxs1[1]]
@@ -712,15 +713,14 @@ class TestBlock(unittest.TestCase):
         res1 = filterdata(data, {'name': name, 'j': 90})
         res2 = filterdata(data, targdict={'name': name, 'j': 90})
 
-        assert_same_sub_schema(res0, targ)
-        assert_same_sub_schema(res1, targ)
-        assert_same_sub_schema(res2, targ)
+        assert_same_sub_schema(res0._items, targ)
+        assert_same_sub_schema(res1._items, targ)
+        assert_same_sub_schema(res2._items, targ)
 
     def test__filterdata_multi_partres_annotation_annotation(self):
         data = self.targobj.children_recur
 
-        targ = (self.trains1[::2] +
-                self.segs1[:1] + self.units1[::2])
+        targ = (self.trains1[::2] + self.segs1[:1] + self.units1[::2])
 
         res0 = filterdata(data, [{'j': 0}, {'i': 0}])
         res1 = filterdata(data, {'j': 0}, i=0)

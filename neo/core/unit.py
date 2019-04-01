@@ -13,6 +13,7 @@ from __future__ import absolute_import, division, print_function
 import numpy as np
 
 from neo.core.container import Container
+from neo.core.spiketrainlist import SpikeTrainList
 
 
 class Unit(Container):
@@ -70,6 +71,7 @@ class Unit(Container):
         '''
         super(Unit, self).__init__(name=name, description=description,
                                    file_origin=file_origin, **annotations)
+        self.spiketrains = SpikeTrainList(segment=self)
         self.channel_index = None
 
     def get_channel_indexes(self):

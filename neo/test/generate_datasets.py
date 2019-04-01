@@ -17,6 +17,7 @@ from neo.core import (AnalogSignal, Block, Epoch, Event, IrregularlySampledSigna
 
 from neo.core.baseneo import _container_name
 from neo.core.dataobject import DataObject
+from neo.core.spiketrainlist import SpikeTrainList
 
 TEST_ANNOTATIONS = [1, 0, 1.5, "this is a test", datetime.fromtimestamp(424242424), None]
 
@@ -443,7 +444,11 @@ def clone_object(obj, n=None):
     Generate a new object and new objects with the same rules as the original.
     '''
     if hasattr(obj, '__iter__') and not hasattr(obj, 'ndim'):
-        return [clone_object(iobj, n=n) for iobj in obj]
+        obj_content = [clone_object(iobj, n=n) for iobj in obj]
+        if isinstance(obj, SpikeTrainList):
+            return SpikeTrainList(items=obj_content)
+        else:
+            return obj_content
 
     cascade = hasattr(obj, 'children') and len(obj.children)
     if n is not None:

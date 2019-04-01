@@ -358,9 +358,9 @@ class TestChannelIndex(unittest.TestCase):
         res1 = self.targobj.filter({'name': name})
         res2 = self.targobj.filter(targdict={'name': name})
 
-        assert_same_sub_schema(res0, targ)
-        assert_same_sub_schema(res1, targ)
-        assert_same_sub_schema(res2, targ)
+        assert_same_sub_schema(res0._items, targ)
+        assert_same_sub_schema(res1._items, targ)
+        assert_same_sub_schema(res2._items, targ)
 
     def test__filter_attribute_single_nores(self):
         targ = []
@@ -432,9 +432,9 @@ class TestChannelIndex(unittest.TestCase):
         res1 = self.targobj.filter({'name': name, 'j': 9})
         res2 = self.targobj.filter(targdict={'name': name, 'j': 9})
 
-        assert_same_sub_schema(res0, targ)
-        assert_same_sub_schema(res1, targ)
-        assert_same_sub_schema(res2, targ)
+        assert_same_sub_schema(res0._items, targ)
+        assert_same_sub_schema(res1._items, targ)
+        assert_same_sub_schema(res2._items, targ)
 
     def test__filter_multi_partres_annotation_annotation(self):
         targ = [self.trains1[0], self.trains1[2]]
@@ -443,16 +443,16 @@ class TestChannelIndex(unittest.TestCase):
         res1 = self.targobj.filter({'j': 0}, i=0)
         res2 = self.targobj.filter([{'j': 0}], i=0)
 
-        assert_same_sub_schema(res0, targ)
-        assert_same_sub_schema(res1, targ)
-        assert_same_sub_schema(res2, targ)
+        assert_same_sub_schema(res0._items, targ)
+        assert_same_sub_schema(res1._items, targ)
+        assert_same_sub_schema(res2._items, targ)
 
     def test__filter_no_annotation_but_object(self):
         targ = []
         for unit in self.targobj.units:
             targ.extend(unit.spiketrains)
         res = self.targobj.filter(objects=SpikeTrain)
-        assert_same_sub_schema(res, targ)
+        assert_same_sub_schema(res._items, targ)
 
         targ = self.targobj.analogsignals
         res = self.targobj.filter(objects=AnalogSignal)
@@ -475,11 +475,11 @@ class TestChannelIndex(unittest.TestCase):
         res4 = self.targobj.filter(j=1, objects=[SpikeTrain,
                                                  ChannelIndex])
 
-        assert_same_sub_schema(res0, targ)
-        assert_same_sub_schema(res1, targ)
-        assert_same_sub_schema(res2, targ)
-        assert_same_sub_schema(res3, targ)
-        assert_same_sub_schema(res4, targ)
+        assert_same_sub_schema(res0._items, targ)
+        assert_same_sub_schema(res1._items, targ)
+        assert_same_sub_schema(res2._items, targ)
+        assert_same_sub_schema(res3._items, targ)
+        assert_same_sub_schema(res4._items, targ)
 
     def test__filter_single_annotation_obj_none(self):
         targ = []
@@ -537,7 +537,7 @@ class TestChannelIndex(unittest.TestCase):
     def test__filter_single_attribute_container_data(self):
         targ = [self.trains1[0]]
         res0 = self.targobj.filter(name=self.trains1[0].name, container=True)
-        assert_same_sub_schema(res0, targ)
+        assert_same_sub_schema(res0._items, targ)
 
     def test__filter_single_annotation_container_norecur(self):
         targ = [self.sigarrs1[1], self.irrsig1[1], self.units1[1]]
@@ -644,9 +644,9 @@ class TestChannelIndex(unittest.TestCase):
         res1 = filterdata(data, {'name': name, 'j': 5})
         res2 = filterdata(data, targdict={'name': name, 'j': 5})
 
-        assert_same_sub_schema(res0, targ)
-        assert_same_sub_schema(res1, targ)
-        assert_same_sub_schema(res2, targ)
+        assert_same_sub_schema(res0._items, targ)
+        assert_same_sub_schema(res1._items, targ)
+        assert_same_sub_schema(res2._items, targ)
 
     def test__filterdata_multi_partres_annotation_annotation(self):
         data = self.targobj.children_recur

@@ -35,7 +35,11 @@ class SpikeTrainList(object):
         """x.__getitem__(y) <==> x[y]"""
         if self._items is None:
             self._spiketrains_from_array()
-        return self._items[i]
+        items = self._items[i]
+        if isinstance(items, SpikeTrain):
+            return items
+        else:
+            return SpikeTrainList(items=items)
 
     def __str__(self):
         """Return str(self)"""
@@ -61,33 +65,35 @@ class SpikeTrainList(object):
         else:
             return len(self._items)
 
+    def _add_spiketrainlists(self, other):
+        if self._spike_time_array is None or other._spike_time_array is None:
+            # if either self or other is not storing multiplexed spike trains
+            # we return
+            return self.__class__(items=self._items[:] + other._items)
+        else:
+            # both self and other are storing multiplexed spike trains
+            # todo: update self._spike_time_array, etc.
+            if self._spiketrain_metadata['units'] != other._spiketrain_metadata['units']:
+                raise ValueError("Incompatible units")
+                # todo: rescale other to the units of self, rather than raising a ValueError
+            if self._spiketrain_metadata['t_start'] != other._spiketrain_metadata['t_start']:
+                raise ValueError("Incompatible t_start")
+                # todo: adjust times and t_start of other to be compatible with self
+            if self._spiketrain_metadata['t_stop'] != other._spiketrain_metadata['t_stop']:
+                raise ValueError("Incompatible t_stop")
+                # todo: adjust t_stop of self and other as necessary
+            return self.__class__.from_spike_time_array(
+                np.hstack((self._spike_time_array, other._spike_time_array)),
+                np.hstack((self._channel_id_array, other._channel_id_array)),
+                self._all_channel_ids + other._all_channel_ids,
+                units=self._spiketrain_metadata['units'],
+                t_start=self._spiketrain_metadata['t_start'],
+                t_stop=self._spiketrain_metadata['t_stop'])
+
     def __add__(self, other):
         """Return self + other"""
         if isinstance(other, self.__class__):
-            if self._spike_time_array is None or other._spike_time_array is None:
-                # if either self or other is not storing multiplexed spike trains
-                # we return
-                return self.__class__(items=self._items[:].extend(other._items))
-            else:
-                # both self and other are storing multiplexed spike trains
-                # todo: update self._spike_time_array, etc.
-                if self.units != other.units:
-                    raise ValueError("Incompatible units")
-                    # todo: rescale other to the units of self, rather than raising a ValueError
-                if self.t_start != other.t_start:
-                    raise ValueError("Incompatible t_start")
-                    # todo: adjust times and t_start of other to be compatible with self
-                if self.t_stop != other.t_stop:
-                    raise ValueError("Incompatible t_stop")
-                    # todo: adjust t_stop of self and other as necessary
-                return self.__class__.from_spike_time_array(
-                    np.hstack((self._spike_time_array, other._spike_time_array))
-                    np.hstack((self._channel_id_array, other._channel_id_array))
-                    self._all_channel_ids +,
-                    units=self.units,
-                    t_start=self.t_start,
-                    t_stop=self.t_stop)
-
+            return self._add_spiketrainlists(other)
         elif other and isinstance(other[0], SpikeTrain):
             for obj in other:
                 obj.segment = self.segment
@@ -98,10 +104,15 @@ class SpikeTrainList(object):
 
     def __radd__(self, other):
         """Return other + self"""
-        if self._items is None:
-            self._spiketrains_from_array()
-        other[:].extend(self._items)
-        return other
+        if isinstance(other, self.__class__):
+            return other._add_spiketrainlists(self)
+        elif other and isinstance(other[0], SpikeTrain):
+            for obj in other:
+                obj.segment = self.segment
+            self._items.extend(other)
+            return self
+        else:
+            return other + self._items
 
     def append(self, obj):
         """L.append(object) -> None -- append object to end"""

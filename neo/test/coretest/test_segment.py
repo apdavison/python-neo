@@ -25,6 +25,7 @@ else:
 from neo.core.segment import Segment
 from neo.core import (AnalogSignal, Block,
                       Epoch, ChannelIndex, SpikeTrain, Unit)
+from neo.core.spiketrainlist import SpikeTrainList
 from neo.core.container import filterdata
 from neo.test.tools import (assert_neo_object_is_compliant,
                             assert_same_sub_schema)
@@ -481,7 +482,7 @@ class TestSegment(unittest.TestCase):
         assert_same_sub_schema(res5, targ)
 
     def test__filter_no_annotation_but_object(self):
-        targ = list(self.targobj.spiketrains)
+        targ = SpikeTrainList(self.targobj.spiketrains)
         res = self.targobj.filter(objects=SpikeTrain)
         assert_same_sub_schema(res, targ)
 
@@ -489,7 +490,7 @@ class TestSegment(unittest.TestCase):
         res = self.targobj.filter(objects=AnalogSignal)
         assert_same_sub_schema(res, targ)
 
-        targ = self.targobj.analogsignals + list(self.targobj.spiketrains)
+        targ = self.targobj.analogsignals + SpikeTrainList(self.targobj.spiketrains)
         res = self.targobj.filter(objects=[AnalogSignal, SpikeTrain])
         assert_same_sub_schema(res, targ)
 

@@ -21,6 +21,7 @@ else:
 from neo.core.unit import Unit
 from neo.core.container import filterdata
 from neo.core import SpikeTrain, ChannelIndex
+from neo.core.spiketrainlist import SpikeTrainList
 from neo.test.tools import (assert_neo_object_is_compliant,
                             assert_arrays_equal,
                             assert_same_sub_schema)
@@ -185,19 +186,19 @@ class TestUnit(unittest.TestCase):
         self.assertEqual(self.unit1.container_children_recur, ())
 
         assert_same_sub_schema(list(self.unit1._single_children),
-                               self.trains1a)
+                               self.trains1a._items)
 
         assert_same_sub_schema(list(self.unit1.data_children),
-                               self.trains1a)
+                               self.trains1a._items)
 
         assert_same_sub_schema(list(self.unit1.data_children_recur),
-                               self.trains1a)
+                               self.trains1a._items)
 
         assert_same_sub_schema(list(self.unit1.children),
-                               self.trains1a)
+                               self.trains1a._items)
 
         assert_same_sub_schema(list(self.unit1.children_recur),
-                               self.trains1a)
+                               self.trains1a._items)
 
         self.assertEqual(len(self.unit1.parents), 1)
         self.assertEqual(self.unit1.parents[0].name, 'chx1')
@@ -232,7 +233,7 @@ class TestUnit(unittest.TestCase):
         assert_same_sub_schema(res10, targ)
 
     def test__filter_annotation_single(self):
-        targ = [self.trains1a[1]]
+        targ = self.trains1a[1:2]
 
         res0 = self.targobj.filter(j=1)
         res1 = self.targobj.filter({'j': 1})
@@ -262,7 +263,7 @@ class TestUnit(unittest.TestCase):
         assert_same_sub_schema(res4, targ)
 
     def test__filter_attribute_single(self):
-        targ = [self.trains1a[0]]
+        targ = self.trains1a[0:1]
 
         name = self.trains1a[0].name
         res0 = self.targobj.filter(name=name)
@@ -286,7 +287,7 @@ class TestUnit(unittest.TestCase):
         assert_same_sub_schema(res2, targ)
 
     def test__filter_multi(self):
-        targ = [self.trains1a[1], self.trains1a[0]]
+        targ = SpikeTrainList(items=[self.trains1a[1], self.trains1a[0]])
 
         name = self.trains1a[0].name
         res0 = self.targobj.filter(name=name, j=1)
@@ -334,7 +335,7 @@ class TestUnit(unittest.TestCase):
         assert_same_sub_schema(res14, targ)
 
     def test__filter_multi_partres(self):
-        targ = [self.trains1a[0]]
+        targ = self.trains1a[0:1]
 
         name = self.trains1a[0].name
         res0 = self.targobj.filter(name=name, j=5)
@@ -357,7 +358,7 @@ class TestUnit(unittest.TestCase):
         assert_same_sub_schema(res, targ)
 
     def test__filter_single_annotation_obj_single(self):
-        targ = [self.trains1a[1]]
+        targ = self.trains1a[1:2]
 
         res0 = self.targobj.filter(j=1, objects='SpikeTrain')
         res1 = self.targobj.filter(j=1, objects=SpikeTrain)
@@ -384,12 +385,12 @@ class TestUnit(unittest.TestCase):
         assert_same_sub_schema(res2, targ)
 
     def test__filter_single_annotation_norecur(self):
-        targ = [self.trains1a[1]]
+        targ = self.trains1a[1:2]
         res0 = self.targobj.filter(j=1, recursive=False)
         assert_same_sub_schema(res0, targ)
 
     def test__filter_single_attribute_norecur(self):
-        targ = [self.trains1a[0]]
+        targ = self.trains1a[0:1]
         res0 = self.targobj.filter(name=self.trains1a[0].name, recursive=False)
         assert_same_sub_schema(res0, targ)
 
@@ -416,22 +417,22 @@ class TestUnit(unittest.TestCase):
         assert_same_sub_schema(res0, targ)
 
     def test__filter_single_annotation_container(self):
-        targ = [self.trains1a[1]]
+        targ = self.trains1a[1:2]
         res0 = self.targobj.filter(j=1, container=True)
         assert_same_sub_schema(res0, targ)
 
     def test__filter_single_attribute_container(self):
-        targ = [self.trains1a[0]]
+        targ = self.trains1a[0:1]
         res0 = self.targobj.filter(name=self.trains1a[0].name, container=True)
         assert_same_sub_schema(res0, targ)
 
     def test__filter_single_annotation_container_norecur(self):
-        targ = [self.trains1a[1]]
+        targ = self.trains1a[1:2]
         res0 = self.targobj.filter(j=1, container=True, recursive=False)
         assert_same_sub_schema(res0, targ)
 
     def test__filter_single_attribute_container_norecur(self):
-        targ = [self.trains1a[0]]
+        targ = self.trains1a[0:1]
         res0 = self.targobj.filter(name=self.trains1a[0].name,
                                    container=True, recursive=False)
         assert_same_sub_schema(res0, targ)
@@ -465,7 +466,7 @@ class TestUnit(unittest.TestCase):
     def test__filterdata_multi(self):
         data = self.targobj.children_recur
 
-        targ = [self.trains1a[1], self.trains1a[0]]
+        targ = SpikeTrainList(items=[self.trains1a[1], self.trains1a[0]])
 
         name = self.trains1a[0].name
         res0 = filterdata(data, name=name, j=1)
@@ -518,7 +519,7 @@ class TestUnit(unittest.TestCase):
     def test__filterdata_multi_partres(self):
         data = self.targobj.children_recur
 
-        targ = [self.trains1a[0]]
+        targ = SpikeTrainList(items=self.trains1a[0:1])
 
         name = self.trains1a[0].name
         res0 = filterdata(data, name=name, j=5)
