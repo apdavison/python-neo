@@ -31,7 +31,7 @@ from neo.core import (AnalogSignal, Block,
                       Segment, SpikeTrain, Unit)
 from neo.io.baseio import BaseIO
 
-from neo.io.proxyobjects import (AnalogSignalProxy,
+from neo.core.proxyobjects import (AnalogSignalProxy,
                 SpikeTrainProxy, EventProxy, EpochProxy,
                 ensure_signal_units, check_annotations,
                 ensure_second, proxyobjectlist)

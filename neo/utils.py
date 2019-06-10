@@ -168,8 +168,8 @@ def _get_from_list(input_list, prop=None):
         for ep in input_list:
             if isinstance(ep, neo.Epoch) or isinstance(ep, neo.Event):
                 sparse_ep = ep.copy()
-            elif isinstance(ep, neo.io.proxyobjects.EpochProxy) \
-                    or isinstance(ep, neo.io.proxyobjects.EventProxy):
+            elif isinstance(ep, neo.core.proxyobjects.EpochProxy) \
+                    or isinstance(ep, neo.core.proxyobjects.EventProxy):
                 # need to load the Event/Epoch in order to be able to filter by array annotations
                 sparse_ep = ep.load()
             for k in prop.keys():
@@ -387,9 +387,9 @@ def add_epoch(
             'Segment has to be of type Segment, not %s' % type(segment))
 
     # load the full event if a proxy object has been given as an argument
-    if isinstance(event1, neo.io.proxyobjects.EventProxy):
+    if isinstance(event1, neo.core.proxyobjects.EventProxy):
         event1 = event1.load()
-    if isinstance(event2, neo.io.proxyobjects.EventProxy):
+    if isinstance(event2, neo.core.proxyobjects.EventProxy):
         event2 = event2.load()
 
     for event in [event1, event2]:
@@ -453,9 +453,9 @@ def match_events(event1, event2):
         not all events in event1 or event2 could be matched.
     """
     # load the full event if a proxy object has been given as an argument
-    if isinstance(event1, neo.io.proxyobjects.EventProxy):
+    if isinstance(event1, neo.core.proxyobjects.EventProxy):
         event1 = event1.load()
-    if isinstance(event2, neo.io.proxyobjects.EventProxy):
+    if isinstance(event2, neo.core.proxyobjects.EventProxy):
         event2 = event2.load()
 
     id1, id2 = 0, 0
@@ -686,7 +686,7 @@ def seg_time_slice(seg, t_start=None, t_stop=None, reset_time=False, **kwargs):
     for ana_id in range(len(seg.analogsignals)):
         if isinstance(seg.analogsignals[ana_id], neo.AnalogSignal):
             ana_time_slice = seg.analogsignals[ana_id].time_slice(t_start, t_stop)
-        elif isinstance(seg.analogsignals[ana_id], neo.io.proxyobjects.AnalogSignalProxy):
+        elif isinstance(seg.analogsignals[ana_id], neo.core.proxyobjects.AnalogSignalProxy):
             ana_time_slice = seg.analogsignals[ana_id].load(time_slice=(t_start, t_stop))
         if reset_time:
             ana_time_slice.t_start = ana_time_slice.t_start + t_shift
@@ -696,7 +696,7 @@ def seg_time_slice(seg, t_start=None, t_stop=None, reset_time=False, **kwargs):
     for st_id in range(len(seg.spiketrains)):
         if isinstance(seg.spiketrains[st_id], neo.SpikeTrain):
             st_time_slice = seg.spiketrains[st_id].time_slice(t_start, t_stop)
-        elif isinstance(seg.spiketrains[st_id], neo.io.proxyobjects.SpikeTrainProxy):
+        elif isinstance(seg.spiketrains[st_id], neo.core.proxyobjects.SpikeTrainProxy):
             st_time_slice = seg.spiketrains[st_id].load(time_slice=(t_start, t_stop))
         if reset_time:
             st_time_slice = shift_spiketrain(st_time_slice, t_shift)
@@ -706,7 +706,7 @@ def seg_time_slice(seg, t_start=None, t_stop=None, reset_time=False, **kwargs):
     for ev_id in range(len(seg.events)):
         if isinstance(seg.events[ev_id], neo.Event):
             ev_time_slice = event_time_slice(seg.events[ev_id], t_start, t_stop)
-        elif isinstance(seg.events[ev_id], neo.io.proxyobjects.EventProxy):
+        elif isinstance(seg.events[ev_id], neo.core.proxyobjects.EventProxy):
             ev_time_slice = seg.events[ev_id].load(time_slice=(t_start, t_stop))
         if reset_time:
             ev_time_slice = shift_event(ev_time_slice, t_shift)
@@ -718,7 +718,7 @@ def seg_time_slice(seg, t_start=None, t_stop=None, reset_time=False, **kwargs):
     for ep_id in range(len(seg.epochs)):
         if isinstance(seg.epochs[ep_id], neo.Epoch):
             ep_time_slice = epoch_time_slice(seg.epochs[ep_id], t_start, t_stop)
-        elif isinstance(seg.epochs[ep_id], neo.io.proxyobjects.EpochProxy):
+        elif isinstance(seg.epochs[ep_id], neo.core.proxyobjects.EpochProxy):
             ep_time_slice = seg.epochs[ep_id].load(time_slice=(t_start, t_stop))
         if reset_time:
             ep_time_slice = shift_epoch(ep_time_slice, t_shift)
