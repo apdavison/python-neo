@@ -33,7 +33,7 @@ from neo.test.generate_datasets import (fake_neo, get_fake_value,
                                         get_fake_values, get_annotations,
                                         clone_object, TEST_ANNOTATIONS)
 from neo.rawio.examplerawio import ExampleRawIO
-from neo.io.proxyobjects import (AnalogSignalProxy, SpikeTrainProxy,
+from neo.core.proxyobjects import (AnalogSignalProxy, SpikeTrainProxy,
                                  EventProxy, EpochProxy)
 
 

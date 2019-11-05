@@ -31,7 +31,7 @@ from neo.core import (Block, Segment, ChannelIndex, AnalogSignal,
 from neo.test.iotest.common_io_test import BaseTestIO
 from neo.io.nixio import NixIO, create_quantity, units_to_string, neover
 from neo.io.nixio_fr import NixIO as NixIO_lazy
-from neo.io.proxyobjects import AnalogSignalProxy, SpikeTrainProxy, EventProxy, EpochProxy
+from neo.core.proxyobjects import AnalogSignalProxy, SpikeTrainProxy, EventProxy, EpochProxy
 
 try:
     import nixio as nix
