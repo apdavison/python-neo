@@ -157,6 +157,7 @@ class SpikeTrainList(object):
                 all_channel_ids = np.unique(self._channel_id_array)
             else:
                 all_channel_ids = self._all_channel_ids
+            self._items = []
             for channel_id in all_channel_ids:
                 mask = self._channel_id_array == channel_id
                 times = self._spike_time_array[mask]
