@@ -55,8 +55,8 @@ class Event(DataObject):
               dtype='|S5')
 
     *Required attributes/properties*:
-        :times: (quantity array 1D) The time of the events.
-        :labels: (numpy.array 1D dtype='S') Names or labels for the events.
+        :times: (quantity array 1D, numpy array 1D or list) The times of the events.
+        :labels: (numpy.array 1D dtype='S' or list) Names or labels for the events.
 
     *Recommended attributes/properties*:
         :name: (str) A label for the dataset.
@@ -81,6 +81,8 @@ class Event(DataObject):
                 file_origin=None, array_annotations=None, **annotations):
         if times is None:
             times = np.array([]) * pq.s
+        elif isinstance(times, (list, tuple)):
+            times = np.array(times)
         if labels is None:
             labels = np.array([], dtype='S')
         else:
@@ -104,7 +106,7 @@ class Event(DataObject):
         # reference dimensionality
         if (len(dim) != 1 or list(dim.values())[0] != 1 or not isinstance(list(dim.keys())[0],
                                                                           pq.UnitTime)):
-            ValueError("Unit %s has dimensions %s, not [time]" % (units, dim.simplified))
+            ValueError("Unit {} has dimensions {}, not [time]".format(units, dim.simplified))
 
         obj = pq.Quantity(times, units=dim).view(cls)
         obj._labels = labels
@@ -190,7 +192,7 @@ class Event(DataObject):
             if attr_self == attr_other:
                 kwargs[name] = attr_self
             else:
-                kwargs[name] = "merge(%s, %s)" % (attr_self, attr_other)
+                kwargs[name] = "merge({}, {})".format(attr_self, attr_other)
 
         print('Event: merge annotations')
         merged_annotations = merge_annotations(self.annotations, other.annotations)
@@ -211,7 +213,7 @@ class Event(DataObject):
         # Note: Array annotations, including labels, cannot be copied
         # because they are linked to their respective timestamps and length of data can be changed
         # here which would cause inconsistencies
-        for attr in ("_labels", "name", "file_origin", "description",
+        for attr in ("name", "file_origin", "description",
                      "annotations"):
             setattr(self, attr, deepcopy(getattr(other, attr, None)))
 
@@ -223,8 +225,9 @@ class Event(DataObject):
             obj.labels = self._labels
         try:
             obj.array_annotate(**deepcopy(self.array_annotations_at_index(i)))
+            obj._copy_data_complement(self)
         except AttributeError:  # If Quantity was returned, not Event
-            pass
+            obj.times = obj
         return obj
 
     def set_labels(self, labels):
@@ -273,6 +276,30 @@ class Event(DataObject):
 
         # Time slicing should create a deep copy of the object
         new_evt = deepcopy(self[indices])
+
+        return new_evt
+
+    def time_shift(self, t_shift):
+        """
+        Shifts an :class:`Event` by an amount of time.
+
+        Parameters:
+        -----------
+        t_shift: Quantity (time)
+            Amount of time by which to shift the :class:`Event`.
+
+        Returns:
+        --------
+        epoch: Event
+            New instance of an :class:`Event` object starting at t_shift later than the
+            original :class:`Event` (the original :class:`Event` is not modified).
+        """
+        new_evt = self.duplicate_with_new_data(times=self.times + t_shift,
+                                               labels=self.labels)
+
+        # Here we can safely copy the array annotations since we know that
+        # the length of the Event does not change.
+        new_evt.array_annotate(**self.array_annotations)
 
         return new_evt
 

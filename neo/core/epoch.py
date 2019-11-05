@@ -58,10 +58,12 @@ class Epoch(DataObject):
               dtype='|S4')
 
     *Required attributes/properties*:
-        :times: (quantity array 1D) The start times of each time period.
-        :durations: (quantity array 1D or quantity scalar) The length(s) of each time period.
+        :times: (quantity array 1D, numpy array 1D or list) The start times
+           of each time period.
+        :durations: (quantity array 1D, numpy array 1D, list, or quantity scalar)
+           The length(s) of each time period.
            If a scalar, the same value is used for all time periods.
-        :labels: (numpy.array 1D dtype='S') Names or labels for the time periods.
+        :labels: (numpy.array 1D dtype='S' or list) Names or labels for the time periods.
 
     *Recommended attributes/properties*:
         :name: (str) A label for the dataset,
@@ -87,6 +89,10 @@ class Epoch(DataObject):
                 description=None, file_origin=None, array_annotations=None, **annotations):
         if times is None:
             times = np.array([]) * pq.s
+        elif isinstance(times, (list, tuple)):
+            times = np.array(times)
+        if isinstance(durations, (list, tuple)):
+            durations = np.array(durations)
         if durations is None:
             durations = np.array([]) * pq.s
         elif durations.size != times.size:
@@ -112,6 +118,8 @@ class Epoch(DataObject):
                 dim = units.dimensionality
             else:
                 dim = pq.quantity.validate_dimensionality(units)
+        if not hasattr(durations, "dimensionality"):
+            durations = pq.Quantity(durations, dim)
         # check to make sure the units are time
         # this approach is much faster than comparing the
         # reference dimensionality
@@ -189,8 +197,7 @@ class Epoch(DataObject):
         '''
         Get the item or slice :attr:`i`.
         '''
-        obj = Epoch(times=super(Epoch, self).__getitem__(i))
-        obj._copy_data_complement(self)
+        obj = super(Epoch, self).__getitem__(i)
         obj._durations = self.durations[i]
         if self._labels is not None and self._labels.size > 0:
             obj._labels = self.labels[i]
@@ -199,8 +206,11 @@ class Epoch(DataObject):
         try:
             # Array annotations need to be sliced accordingly
             obj.array_annotate(**deepcopy(self.array_annotations_at_index(i)))
+            obj._copy_data_complement(self)
         except AttributeError:  # If Quantity was returned, not Epoch
-            pass
+            obj.times = obj
+            obj.durations = obj._durations
+            obj.labels = obj._labels
         return obj
 
     def __getslice__(self, i, j):
@@ -238,7 +248,7 @@ class Epoch(DataObject):
             if attr_self == attr_other:
                 kwargs[name] = attr_self
             else:
-                kwargs[name] = "merge(%s, %s)" % (attr_self, attr_other)
+                kwargs[name] = "merge({}, {})".format(attr_self, attr_other)
 
         merged_annotations = merge_annotations(self.annotations, other.annotations)
         kwargs.update(merged_annotations)
@@ -299,6 +309,31 @@ class Epoch(DataObject):
 
         # Time slicing should create a deep copy of the object
         new_epc = deepcopy(self[indices])
+
+        return new_epc
+
+    def time_shift(self, t_shift):
+        """
+        Shifts an :class:`Epoch` by an amount of time.
+
+        Parameters:
+        -----------
+        t_shift: Quantity (time)
+            Amount of time by which to shift the :class:`Epoch`.
+
+        Returns:
+        --------
+        epoch: :class:`Epoch`
+            New instance of an :class:`Epoch` object starting at t_shift later than the
+            original :class:`Epoch` (the original :class:`Epoch` is not modified).
+        """
+        new_epc = self.duplicate_with_new_data(times=self.times + t_shift,
+                                               durations=self.durations,
+                                               labels=self.labels)
+
+        # Here we can safely copy the array annotations since we know that
+        # the length of the Epoch does not change.
+        new_epc.array_annotate(**self.array_annotations)
 
         return new_epc
 
