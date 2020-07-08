@@ -132,7 +132,6 @@ from neo.rawio.spike2rawio import Spike2RawIO
 from neo.rawio.tdtrawio import TdtRawIO
 from neo.rawio.winedrrawio import WinEdrRawIO
 from neo.rawio.winwcprawio import WinWcpRawIO
-#from neo.rawio.nwbrawio import NWBRawIO #, NWBReader # NWB format
 
 rawiolist = [
     AxographRawIO,
@@ -154,7 +153,6 @@ rawiolist = [
     TdtRawIO,
     WinEdrRawIO,
     WinWcpRawIO,
-#    NWBRawIO, # NWB format
 ]
 
 

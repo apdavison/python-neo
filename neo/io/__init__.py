@@ -42,6 +42,7 @@ Classes:
 * :attr:`NeuroshareIO`
 * :attr:`NixIO`
 * :attr:`NSDFIO`
+* :attr:`NWBIO`
 * :attr:`OpenEphysIO`
 * :attr:`PickleIO`
 * :attr:`PlexonIO`
@@ -169,7 +170,11 @@ Classes:
 
 .. autoclass:: neo.io.NSDFIO
 
+    .. autoattribute:: extensions
+
 .. autoclass:: neo.io.NWBIO
+
+    .. autoattribute:: extensions
 
 .. autoclass:: neo.io.OpenEphysIO
 

@@ -5,182 +5,181 @@ Tests of neo.io.nwbio
 
 from __future__ import unicode_literals, print_function, division, absolute_import
 import unittest
-from neo.io.nwbio import NWBIO
+import os
+try:
+    from urllib.request import urlretrieve
+except ImportError:
+    from urllib import urlretrieve
 from neo.test.iotest.common_io_test import BaseTestIO
-from neo.core import AnalogSignal, SpikeTrain, Event, Epoch, IrregularlySampledSignal, Segment, Unit, Block, ChannelIndex
-import pynwb
-from pynwb import *
+from neo.core import AnalogSignal, SpikeTrain, Event, Epoch, IrregularlySampledSignal, Segment, Unit, Block, ChannelIndex, ImageSequence
+try:
+    import pynwb
+    from neo.io.nwbio import NWBIO
+    HAVE_PYNWB = True
+except (ImportError, SyntaxError):
+    NWBIO = None
+    HAVE_PYNWB = False
 import quantities as pq
 import numpy as np
+from numpy.testing import assert_array_equal, assert_allclose
+from neo.test.rawiotest.tools import create_local_temp_dir
 
-class TestNWBIO(unittest.TestCase, ):
+
+@unittest.skipUnless(HAVE_PYNWB, "requires pynwb")
+class TestNWBIO(unittest.TestCase):
     ioclass = NWBIO
-    files_to_download =  [
-        # My NWB files
-#              '/home/elodie/NWB_Files/NWB_File_python_3_pynwb_101_ephys_data_bis.nwb', # File created with the latest version of pynwb=1.0.1 only with ephys data File on my github page
-###              '/Users/legouee/NWBwork/my_notebook/NWB_File_python_3_pynwb_101_ephys_data_bis.nwb'
-#              '/Users/legouee/NWBwork/my_notebook/My_first_dataset.nwb'
-              '/Users/legouee/NWBwork/my_notebook/My_first_dataset_neo8.nwb'
-
-        # Files from Allen Institute
-        # NWB files downloadable from http://download.alleninstitute.org/informatics-archive/prerelease/
-###              '/home/elodie/NWB_Files/NWB_org/H19.28.012.11.05-2.nwb'
-#              '/home/elodie/NWB_Files/NWB_org/H19.28.012.11.05-3.nwb'
-#              '/home/elodie/NWB_Files/NWB_org/H19.28.012.11.05-4.nwb'
-###              '/home/elodie/NWB_Files/NWB_org/H19.29.141.11.21.01.nwb'
-#              '/home/elodie/NWB_Files/NWB_org/behavior_ophys_session_775614751.nwb'
-#              '/home/elodie/NWB_Files/NWB_org/ecephys_session_785402239.nwb'
-
-        # File written with NWBIO class()
-###              '/home/elodie/env_NWB_py3/my_notebook/my_first_test_neo_to_nwb.nwb'
-###              '/home/elodie/env_NWB_py3/my_notebook/my_first_test_neo_to_nwb_test_NWBIO.nwb'
-#              '/home/elodie/env_NWB_py3/my_notebook/my_first_test_neo_to_nwb_test_NWBIO_2.nwb'
-###            '/home/elodie/env_NWB_py3/my_notebook/my_first_test_neo_to_nwb_test_NWBIO.nwb'
+    files_to_download = [
+        #        Files from Allen Institute :
+        # "http://download.alleninstitute.org/informatics-archive/prerelease/H19.28.012.11.05-2.nwb",  # 64 MB
+        "http://download.alleninstitute.org/informatics-archive/prerelease/H19.29.141.11.21.01.nwb",  # 7 MB
     ]
-    entities_to_test = files_to_download
 
+    def test_read(self):
+        self.local_test_dir = create_local_temp_dir("nwb")
+        os.makedirs(self.local_test_dir, exist_ok=True)
+        for url in self.files_to_download:
+            local_filename = os.path.join(self.local_test_dir, url.split("/")[-1])
+            if not os.path.exists(local_filename):
+                try:
+                    urlretrieve(url, local_filename)
+                except IOError as exc:
+                    raise unittest.TestCase.failureException(exc)
+            io = NWBIO(local_filename, 'r')
+            blocks = io.read()
 
-    def test_nwbio(self):
-        # read the blocks
-        reader = NWBIO(filename=self.files_to_download[0], mode='r')
-        print("reader = ", reader)
-#        print("reader.read() = ", reader.read())
-        
-        print("reader.read_block() = ", reader.read_block())
-        print("   ")
-#        blocks = reader.read(lazy=False)
+    def test_roundtrip(self):
 
-        #-------------------------------------------------------
-        blocks=[]
-        for ind in range(2): # 2 blocks
-            blk = Block(name='%s' %ind)
-            blocks.append(blk)
-        #-------------------------------------------------------
-
-        # access to segments
-        for block in blocks:
-            # Tests of Block
-            self.assertTrue(isinstance(block.name, str))
-            # Segment
-            for segment in block.segments:
-                self.assertEqual(segment.block, block)
-                # AnalogSignal
-                for asig in segment.analogsignals:
-                    self.assertTrue(isinstance(asig, AnalogSignal))
-                    self.assertTrue(asig.sampling_rate, pq.Hz)
-                    self.assertTrue(asig.units, pq)
-                # Spiketrain
-                for st in segment.spiketrains:
-                    self.assertTrue(isinstance(st, SpikeTrain))          
-
-
-    def test_segment(self, **kargs):
-        seg = Segment(index=5)
-        r = NWBIO(filename=self.files_to_download[0], mode='r')
-
-
-#        #-------------------------------------------------------
-#        blocks=[]
-#        for ind in range(2): # 2 blocks
-#            blk = Block(name='%s' %ind)
-#            blocks.append(blk)
-#        #-------------------------------------------------------
-#        seg_nwb = r.read()
-##        seg_nwb = r.read(blocks) # equivalent to read_all_blocks()
-
-
-        seg_nwb = r.read_block()        
-        self.assertTrue(seg, Segment)
-        self.assertTrue(seg_nwb, Segment)
-        self.assertTrue(seg_nwb, seg)
-        self.assertIsNotNone(seg_nwb, seg)
-
-    def test_analogsignals_neo(self, **kargs):
-        sig_neo = AnalogSignal(signal=[1, 2, 3], units='V', t_start=np.array(3.0)*pq.s, sampling_rate=1*pq.Hz)
-        self.assertTrue(isinstance(sig_neo, AnalogSignal))
-        r = NWBIO(filename=self.files_to_download[0], mode='r')
-#        obj_nwb = r.read()
-        obj_nwb = r.read_block()        
-        self.assertTrue(obj_nwb, AnalogSignal)
-        self.assertTrue(obj_nwb, sig_neo)
-
-    
-    def test_read_irregularlysampledsignal(self, **kargs):
-        irsig0 = IrregularlySampledSignal([0.0, 1.23, 6.78], [1, 2, 3], units='mV', time_units='ms')
-        irsig1 = IrregularlySampledSignal([0.01, 0.03, 0.12]*pq.s, [[4, 5], [5, 4], [6, 3]]*pq.nA)
-        self.assertTrue(isinstance(irsig0, IrregularlySampledSignal))
-        self.assertTrue(isinstance(irsig1, IrregularlySampledSignal))
-        r = NWBIO(filename=self.files_to_download[0], mode='r')
-#        irsig_nwb = r.read()
-        irsig_nwb = r.read_block()        
-        self.assertTrue(irsig_nwb, IrregularlySampledSignal)
-        self.assertTrue(irsig_nwb, irsig0)
-        self.assertTrue(irsig_nwb, irsig1)
-
-    def test_read_event(self, **kargs):
-        evt_neo = Event(np.arange(0, 30, 10)*pq.s, labels=np.array(['trig0', 'trig1', 'trig2'], dtype='S'))
-        r = NWBIO(filename=self.files_to_download[0], mode='r')
-#        event_nwb = r.read()
-        event_nwb = r.read_block()
-        self.assertTrue(event_nwb, evt_neo)
-        self.assertIsNotNone(event_nwb, evt_neo)
-
-    def test_read_epoch(self, **kargs):
-        epc_neo = Epoch(times=np.arange(0, 30, 10)*pq.s,
-                    durations=[10, 5, 7]*pq.ms,
-                    labels=np.array(['btn0', 'btn1', 'btn2'], dtype='S'))
-        r = NWBIO(filename=self.files_to_download[0], mode='r')
-#        epoch_nwb = r.read()
-        epoch_nwb = r.read_block()
-        self.assertTrue(epoch_nwb, Epoch)
-        self.assertTrue(epoch_nwb, epc_neo)
-        self.assertIsNotNone(epoch_nwb, epc_neo)
-
-    def test_write_NWB_Files(self):
-        '''
-        Test function to write several blocks containing several segments and analogsignals.
-        '''
-        print("Test function test_write_NWB_Files")
-        blocks = []
-
+        # Define Neo blocks
         bl0 = Block(name='First block')
         bl1 = Block(name='Second block')
         bl2 = Block(name='Third block')
-        print("bl0.segments = ", bl0.segments)      
-        print("bl1.segments = ", bl1.segments)
-        print("bl2.segments = ", bl2.segments)
-        blocks = [bl0, bl1, bl2]
-        print("blocks = ", blocks)
+        original_blocks = [bl0, bl1, bl2]
 
-        num_seg = 3 # number of segments
+        num_seg = 4  # number of segments
+        num_chan = 3  # number of channels
 
-        for blk in blocks:
-            print("blk = ", blk)
-            for ind in range(num_seg): # number of Segment
-                seg = Segment(name='segment %d' % ind, index=ind)
+        for blk in original_blocks:
+
+            for ind in range(num_seg):  # number of Segment
+                seg = Segment(index=ind)
+                seg.block = blk
                 blk.segments.append(seg)
 
-            for seg in blk.segments: # AnalogSignal objects
-                # 3 AnalogSignals
-                print("seg = ", seg)
-                a = AnalogSignal(np.random.randn(num_seg, 44)*pq.nA, sampling_rate=10*pq.kHz)
-                b = AnalogSignal(np.random.randn(num_seg, 64)*pq.nA, sampling_rate=10*pq.kHz)
-                c = AnalogSignal(np.random.randn(num_seg, 33)*pq.nA, sampling_rate=10*pq.kHz)
-       
-                seg.analogsignals.append(a) 
-                seg.analogsignals.append(b) 
+            for seg in blk.segments:  # AnalogSignal objects
+
+                # 3 Neo AnalogSignals
+                a = AnalogSignal(np.random.randn(44, num_chan) * pq.nA,
+                                 sampling_rate=10 * pq.kHz,
+                                 t_start=50 * pq.ms)
+                b = AnalogSignal(np.random.randn(64, num_chan) * pq.mV,
+                                 sampling_rate=8 * pq.kHz,
+                                 t_start=40 * pq.ms)
+                c = AnalogSignal(np.random.randn(33, num_chan) * pq.uA,
+                                 sampling_rate=10 * pq.kHz,
+                                 t_start=120 * pq.ms)
+
+                # 2 Neo IrregularlySampledSignals
+                d = IrregularlySampledSignal(np.arange(7.0)*pq.ms,
+                                             np.random.randn(7, num_chan)*pq.mV)
+
+                # 2 Neo SpikeTrains
+                train = SpikeTrain(times=[1, 2, 3] * pq.s, t_start=1.0, t_stop=10.0)
+                train2 = SpikeTrain(times=[4, 5, 6] * pq.s, t_stop=10.0)
+                # todo: add waveforms
+
+                # 1 Neo Event
+                evt = Event(times=np.arange(0, 30, 10) * pq.ms,
+                            labels=np.array(['ev0', 'ev1', 'ev2']))
+
+                # 2 Neo Epochs
+                epc = Epoch(times=np.arange(0, 30, 10) * pq.s,
+                            durations=[10, 5, 7] * pq.ms,
+                            labels=np.array(['btn0', 'btn1', 'btn2']))
+
+                epc2 = Epoch(times=np.arange(10, 40, 10) * pq.s,
+                             durations=[9, 3, 8] * pq.ms,
+                             labels=np.array(['btn3', 'btn4', 'btn5']))
+
+                seg.spiketrains.append(train)
+                seg.spiketrains.append(train2)
+
+                seg.epochs.append(epc)
+                seg.epochs.append(epc2)
+
+                seg.analogsignals.append(a)
+                seg.analogsignals.append(b)
                 seg.analogsignals.append(c)
+                seg.irregularlysampledsignals.append(d)
+                seg.events.append(evt)
+                a.segment = seg
+                b.segment = seg
+                c.segment = seg
+                d.segment = seg
+                evt.segment = seg
+                train.segment = seg
+                train2.segment = seg
+                epc.segment = seg
+                epc2.segment = seg
 
-        print("END blocks = ", blocks)
+        # write to file
+        test_file_name = "test_round_trip.nwb"
+        iow = NWBIO(filename=test_file_name, mode='w')
+        iow.write_all_blocks(original_blocks)
 
-        # Save the file
-#        filename = '/home/elodie/env_NWB_py3/my_notebook/my_first_test_neo_to_nwb_test_NWBIO.nwb'
-        filename = '/Users/legouee/NWBwork/my_notebook/my_first_test_neo_to_nwb_test_NWBIO_in_test_nwbio.nwb'
-        print("filename = ", filename)
-        w_file = NWBIO(filename=filename, mode='w') # Write the .nwb file
-        print("w_file = ", w_file)
-        blocks = w_file.write(blk)
-        print("*** END test_write_NWB_Files ***")
+        ior = NWBIO(filename=test_file_name, mode='r')
+        retrieved_blocks = ior.read_all_blocks()
+
+        self.assertEqual(len(retrieved_blocks), 3)
+        self.assertEqual(len(retrieved_blocks[2].segments), num_seg)
+
+        original_signal_22b = original_blocks[2].segments[2].analogsignals[1]
+        retrieved_signal_22b = retrieved_blocks[2].segments[2].analogsignals[1]
+        for attr_name in ("name", "units", "sampling_rate", "t_start"):
+            retrieved_attribute = getattr(retrieved_signal_22b, attr_name)
+            original_attribute = getattr(original_signal_22b, attr_name)
+            self.assertEqual(retrieved_attribute, original_attribute)
+        assert_array_equal(retrieved_signal_22b.magnitude, original_signal_22b.magnitude)
+
+        original_issignal_22d = original_blocks[2].segments[2].irregularlysampledsignals[0]
+        retrieved_issignal_22d = retrieved_blocks[2].segments[2].irregularlysampledsignals[0]
+        for attr_name in ("name", "units", "t_start"):
+            retrieved_attribute = getattr(retrieved_issignal_22d, attr_name)
+            original_attribute = getattr(original_issignal_22d, attr_name)
+            self.assertEqual(retrieved_attribute, original_attribute)
+        assert_array_equal(retrieved_issignal_22d.times.rescale('ms').magnitude,
+                           original_issignal_22d.times.rescale('ms').magnitude)
+        assert_array_equal(retrieved_issignal_22d.magnitude, original_issignal_22d.magnitude)
+
+        original_event_11 = original_blocks[1].segments[1].events[0]
+        retrieved_event_11 = retrieved_blocks[1].segments[1].events[0]
+        for attr_name in ("name",):
+            retrieved_attribute = getattr(retrieved_event_11, attr_name)
+            original_attribute = getattr(original_event_11, attr_name)
+            self.assertEqual(retrieved_attribute, original_attribute)
+        assert_array_equal(retrieved_event_11.rescale('ms').magnitude,
+                           original_event_11.rescale('ms').magnitude)
+        assert_array_equal(retrieved_event_11.labels, original_event_11.labels)
+
+        original_spiketrain_131 = original_blocks[1].segments[1].spiketrains[1]
+        retrieved_spiketrain_131 = retrieved_blocks[1].segments[1].spiketrains[1]
+        for attr_name in ("name", "t_start", "t_stop"):
+            retrieved_attribute = getattr(retrieved_spiketrain_131, attr_name)
+            original_attribute = getattr(original_spiketrain_131, attr_name)
+            self.assertEqual(retrieved_attribute, original_attribute)
+        assert_array_equal(retrieved_spiketrain_131.times.rescale('ms').magnitude,
+                           original_spiketrain_131.times.rescale('ms').magnitude)
+
+        original_epoch_11 = original_blocks[1].segments[1].epochs[0]
+        retrieved_epoch_11 = retrieved_blocks[1].segments[1].epochs[0]
+        for attr_name in ("name",):
+            retrieved_attribute = getattr(retrieved_epoch_11, attr_name)
+            original_attribute = getattr(original_epoch_11, attr_name)
+            self.assertEqual(retrieved_attribute, original_attribute)
+        assert_array_equal(retrieved_epoch_11.rescale('ms').magnitude,
+                           original_epoch_11.rescale('ms').magnitude)
+        assert_allclose(retrieved_epoch_11.durations.rescale('ms').magnitude,
+                        original_epoch_11.durations.rescale('ms').magnitude)
+        assert_array_equal(retrieved_epoch_11.labels, original_epoch_11.labels)
 
 
 if __name__ == "__main__":
