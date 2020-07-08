@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Here a list of proxy object that can be used when lazy=True at neo.io level.
 
@@ -12,6 +11,7 @@ ineherits neo.rawio.
 
 import numpy as np
 import quantities as pq
+import logging
 
 from neo.core.baseneo import BaseNeo
 
@@ -20,6 +20,7 @@ from neo.core import (AnalogSignal,
                       Epoch, Event, SpikeTrain)
 from neo.core.dataobject import ArrayDict
 
+import logging
 
 class BaseProxy(BaseNeo):
     def __init__(self, array_annotations=None, **annotations):
@@ -431,9 +432,6 @@ class _EventOrEpoch(BaseProxy):
         if durations is not None:
             durations = self._rawio.rescale_epoch_duration(durations, dtype=dtype) * pq.s
 
-        # this should be remove when labesl will be unicode
-        labels = labels.astype('S')
-
         h = self._rawio.header['event_channels'][self._event_channel_index]
         if h['type'] == b'event':
             ret = Event(times=times, labels=labels, units='s',
@@ -508,7 +506,7 @@ proxyobjectlist = [AnalogSignalProxy, SpikeTrainProxy, EventProxy,
 
 
 unit_convert = {'Volts': 'V', 'volts': 'V', 'Volt': 'V',
-                'volt': 'V', ' Volt': 'V', 'microV': 'V'}
+                'volt': 'V', ' Volt': 'V', 'microV': 'uV', 'µV': 'uV'}
 
 
 def ensure_signal_units(units):
@@ -522,6 +520,7 @@ def ensure_signal_units(units):
         logging.warning('Units "{}" can not be converted to a quantity. Using dimensionless '
                         'instead'.format(units))
         units = ''
+        units = pq.Quantity(1, units)
     return units
 
 

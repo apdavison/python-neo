@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 BaseFromRaw
 ======
@@ -14,13 +13,7 @@ of the lazy load with proxy objects.
 
 
 """
-# needed for python 3 compatibility
-from __future__ import print_function, division, absolute_import
-# from __future__ import unicode_literals is not compatible with numpy.dtype both py2 py3
-
-import warnings
 import collections
-import logging
 import numpy as np
 
 from neo import logging_handler
@@ -146,12 +139,13 @@ class BaseFromRaw(BaseIO):
                     chidx_annotations.pop('name')
                 chidx_annotations = check_annotations(chidx_annotations)
                 # this should be done with array_annotation soon:
-                ch_names = all_channels[ind_abs]['name'].astype('S')
+                ch_names = all_channels[ind_abs]['name'].astype('U')
                 neo_channel_index = ChannelIndex(index=ind_within,
                                                  channel_names=ch_names,
                                                  channel_ids=all_channels[ind_abs]['id'],
                                                  name='Channel group {}'.format(i),
-                                                 **chidx_annotations)
+                                                 )
+                neo_channel_index.annotations.update(chidx_annotations)
 
                 bl.channel_indexes.append(neo_channel_index)
 

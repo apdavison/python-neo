@@ -8,8 +8,8 @@ system.
 Dependencies
 ============
 
-    * Python_ >= 2.7
-    * numpy_ >= 1.10.0
+    * Python_ >= 3.5
+    * numpy_ >= 1.11.0
     * quantities_ >= 0.12.1
 
 For Debian/Ubuntu, you can install these using::

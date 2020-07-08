@@ -1,11 +1,7 @@
-# -*- coding: utf-8 -*-
 """
 This module defines :class:`BaseNeo`, the abstract base class
 used by all :module:`neo.core` classes.
 """
-
-# needed for python 3 compatibility
-from __future__ import absolute_import, division, print_function
 
 from datetime import datetime, date, time, timedelta
 from decimal import Decimal
@@ -26,11 +22,6 @@ try:
     ALLOWED_ANNOTATION_TYPES += (long, unicode)
 except NameError:
     pass
-
-try:
-    basestring
-except NameError:
-    basestring = str
 
 logger = logging.getLogger("Neo")
 
@@ -80,7 +71,7 @@ def merge_annotation(a, b):
         return np.append(a, b)
     elif isinstance(a, list):  # concatenate b to a
         return a + b
-    elif isinstance(a, basestring):
+    elif isinstance(a, str):
         if a == b:
             return a
         else:
@@ -90,7 +81,7 @@ def merge_annotation(a, b):
         return a
 
 
-def merge_annotations(A, B):
+def merge_annotations(A, *Bs):
     """
     Merge two sets of annotations.
 
@@ -102,21 +93,19 @@ def merge_annotations(A, B):
         For strings: concatenate with ';'
         Otherwise: warn if the annotations are not equal
     """
-    merged = {}
-    for name in A:
-        if name in B:
-            try:
-                merged[name] = merge_annotation(A[name], B[name])
-            except BaseException as exc:
-                # exc.args += ('key %s' % name,)
-                # raise
-                merged[name] = "MERGE CONFLICT"  # temporary hack
-        else:
-            merged[name] = A[name]
-    for name in B:
-        if name not in merged:
-            merged[name] = B[name]
-    logger.debug("Merging annotations: A=%s B=%s merged=%s", A, B, merged)
+    merged = A.copy()
+    for B in Bs:
+        for name in B:
+            if name not in merged:
+                merged[name] = B[name]
+            else:
+                try:
+                    merged[name] = merge_annotation(merged[name], B[name])
+                except BaseException as exc:
+                    # exc.args += ('key %s' % name,)
+                    # raise
+                    merged[name] = "MERGE CONFLICT"  # temporary hack
+    logger.debug("Merging annotations: A=%s Bs=%s merged=%s", A, Bs, merged)
     return merged
 
 
@@ -150,7 +139,7 @@ def _container_name(class_name):
     return name_map.get(class_name, _reference_name(class_name) + 's')
 
 
-class BaseNeo(object):
+class BaseNeo:
     """
     This is the base class from which all Neo objects inherit.
 
@@ -369,7 +358,7 @@ class BaseNeo(object):
         """
         return self._necessary_attrs + self._recommended_attrs
 
-    def merge_annotations(self, other):
+    def merge_annotations(self, *others):
         """
         Merge annotations from the other object into this one.
 
@@ -381,17 +370,18 @@ class BaseNeo(object):
             For strings: concatenate with ';'
             Otherwise: fail if the annotations are not equal
         """
+        other_annotations = [other.annotations for other in others]
         merged_annotations = merge_annotations(self.annotations,
-                                               other.annotations)
+                                               *other_annotations)
         self.annotations.update(merged_annotations)
 
-    def merge(self, other):
+    def merge(self, *others):
         """
         Merge the contents of another object into this one.
 
         See :meth:`merge_annotations` for details of the merge operation.
         """
-        self.merge_annotations(other)
+        self.merge_annotations(*others)
 
     def set_parent(self, obj):
         """
