@@ -17,6 +17,7 @@ Sample datasets from Allen Institute - http://alleninstitute.github.io/AllenSDK/
 
 from __future__ import absolute_import, division
 
+import os
 from itertools import chain
 from datetime import datetime
 import json
@@ -124,13 +125,14 @@ class NWBIO(BaseIO):
         BaseIO.__init__(self, filename=filename)
         self.filename = filename
         self.blocks_written = 0
-#        print("end __init__")
+        self.nwb_file_mode = mode
 
     def read_all_blocks(self, lazy=False, **kwargs):
         """
 
         """
-        io = pynwb.NWBHDF5IO(self.filename, mode='r')  # Open a file with NWBHDF5IO
+        assert self.nwb_file_mode in ('r',)
+        io = pynwb.NWBHDF5IO(self.filename, mode=self.nwb_file_mode)  # Open a file with NWBHDF5IO
         self._file = io.read()
         print("self._file = ", self._file)
 
@@ -460,9 +462,15 @@ class NWBIO(BaseIO):
                 annotations[annotation_name] = kwargs[annotation_name]
             else:
                 for block in blocks:
-                    print("block Issue 796 = ", block)
-                    #if annotation_name in block.annotations:
-                    #    annotations[annotation_name].add(block.annotations[annotation_name])
+                    if annotation_name in block.annotations:
+                        try:
+                            annotations[annotation_name].add(block.annotations[annotation_name])
+                        except TypeError:
+                            if annotation_name in POSSIBLE_JSON_FIELDS:
+                                encoded = json.dumps(block.annotations[annotation_name])
+                                annotations[annotation_name].add(encoded)
+                            else:
+                                raise
                 if annotation_name in annotations:
                     if len(annotations[annotation_name]) > 1:
                         raise NotImplementedError(
@@ -480,7 +488,10 @@ class NWBIO(BaseIO):
         # todo: store additional Neo annotations somewhere in NWB file
         nwbfile = NWBFile(**annotations)
 
-        io_nwb = pynwb.NWBHDF5IO(self.filename, manager=get_manager(), mode='w')
+        assert self.nwb_file_mode in ('w',)  # possibly expand to 'a'ppend later
+        if self.nwb_file_mode == "w" and os.path.exists(self.filename):
+            os.remove(self.filename)
+        io_nwb = pynwb.NWBHDF5IO(self.filename, manager=get_manager(), mode=self.nwb_file_mode)
 
         nwbfile.add_unit_column('_name', 'the name attribute of the SpikeTrain')
         #nwbfile.add_unit_column('_description', 'the description attribute of the SpikeTrain')
@@ -561,13 +572,19 @@ class NWBIO(BaseIO):
                             comments=json.dumps(hierarchy))
             print("tS IrregularSampledSignal = ", tS)
         else:
-            print("else hierarchy = ", hierarchy)
-            print("format(signal.__class__.__name__) = ", format(signal.__class__.__name__))
-            print("signal.__class__.__name__ = ", signal.__class__.__name__)
-        #    raise TypeError("signal has type {0}, should be AnalogSignal or IrregularlySampledSignal".format(
-        #        signal.__class__.__name__))
-        #nwbfile.add_acquisition(tS)
-        #return tS
+            raise TypeError("signal has type {0}, should be AnalogSignal or IrregularlySampledSignal".format(
+                signal.__class__.__name__))
+        nwb_group = signal.annotations.get("nwb_group", "acquisition")
+        add_method_map = {
+            "acquisition": nwbfile.add_acquisition,
+            "stimulus": nwbfile.add_stimulus
+        }
+        if nwb_group in add_method_map:
+            add_time_series = add_method_map[nwb_group]
+        else:
+            raise NotImplementedError("NWB group '{}' not yet supported".format(nwb_group))
+        add_time_series(tS)
+        return tS
 
     def _write_spiketrain(self, nwbfile, spiketrain):
 #        print("*** _write_spiketrain ***")
