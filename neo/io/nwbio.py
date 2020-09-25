@@ -46,6 +46,7 @@ try:
     from pynwb import NWBFile, TimeSeries, get_manager
     from pynwb.base import ProcessingModule
     from pynwb.ecephys import ElectricalSeries, Device, EventDetection
+    from pynwb.icephys import VoltageClampSeries, VoltageClampStimulusSeries, CurrentClampStimulusSeries, CurrentClampSeries, PatchClampSeries
     from pynwb.behavior import SpatialSeries
     from pynwb.misc import AnnotationSeries
     from pynwb import image
@@ -84,7 +85,6 @@ POSSIBLE_JSON_FIELDS = (
 
 
 def try_json_field(content):
-#    print("*** def try_json_field ***")
     try:
         return json.loads(content)
     except JSONDecodeError:
@@ -117,7 +117,6 @@ class NWBIO(BaseIO):
         Arguments:
             filename : the filename
         """
-#        print("*** def __init__ 1 ***")
         if not have_pynwb:
             raise Exception("Please install the pynwb package to use NWBIO")
         if not have_hdmf:
@@ -134,7 +133,6 @@ class NWBIO(BaseIO):
         assert self.nwb_file_mode in ('r',)
         io = pynwb.NWBHDF5IO(self.filename, mode=self.nwb_file_mode)  # Open a file with NWBHDF5IO
         self._file = io.read()
-        print("self._file = ", self._file)
 
         self.global_block_metadata = {}
         for annotation_name in GLOBAL_ANNOTATIONS:
@@ -151,34 +149,24 @@ class NWBIO(BaseIO):
         if "file_create_date" in self.global_block_metadata:
             self.global_block_metadata["file_datetime"] = self.global_block_metadata["file_create_date"]
 
-#        print("Begin of loop self...")
         self._blocks = {}
-#        print("blocks")
         self._read_acquisition_group(lazy=lazy)
-#        print("acquisition group")
         self._read_stimulus_group(lazy)
-#        print("stimulus group")
         self._read_units(lazy=lazy)
-#        print("read units")
         self._read_epochs_group(lazy)
-        print("End self...")
-        print("self._blocks.values() = ", self._blocks.values())
         return list(self._blocks.values())
 
     def read_block(self, lazy=False, **kargs):
         """
         Load the first block in the file.
         """
-#        print("*** def read_block ***")
         return self.read_all_blocks(lazy=lazy)[0]
-#        print("END def read block")
 
     def _get_segment(self, block_name, segment_name):
         # If we've already created a Block with the given name return it,
         #   otherwise create it now and store it in self._blocks.
         # If we've already created a Segment in the given block, return it,
         #   otherwise create it now and return it.
-#        print("*** def _get_segment ***")
         if block_name in self._blocks:
             block = self._blocks[block_name]
         else:
@@ -192,13 +180,11 @@ class NWBIO(BaseIO):
         if segment is None:
             segment = Segment(name=segment_name)
             segment.block = block
-            block.segments.append(segment)
-#        print("end get segment")        
+            block.segments.append(segment)     
         return segment
 
 
     def _read_epochs_group(self, lazy):
-#        print("*** def _read_epochs_group ***")
         if self._file.epochs is not None:
             try:
                 # NWB files created by Neo store the segment, block and epoch names as extra columns
@@ -230,60 +216,23 @@ class NWBIO(BaseIO):
                 epoch.segment = segment
     
     def _read_timeseries_group(self, group_name, lazy):
-#        print("*** def _read_timeseries_group ***")
         group = getattr(self._file, group_name)
-#        print("group.values() = ", group.values())
-#        print("group = ", group)
-
-        print("self._file.get_processing_module = ", self._file.get_processing_module)
-
         for timeseries in group.values():
-
-#            print("timeseries.neurodata_type = ", timeseries.neurodata_type)
-#            print("timeseries.ProcessingModule = ", timeseries.get_processing_module)
-            
-#            print("timeseries.name = ", timeseries.name)
-            #print("timeseries.rate = ", timeseries.rate)
+#            print("timeseries = ", timeseries)
 
 ######            if timeseries.neurodata_type!='TimeSeries':
-            
             if timeseries.name=='Clustering': #'EventDetection': #'EventWaveform': #'LFP' or 'FilteredEphys' or 'FeatureExtraction':
 #            if timeseries.name!='pynwb.base.timeseries':
                 block_name = "default"
                 segment_name = "default"
-               
                 description = "default"
-                ###print("timeseries.electrical_series = ", timeseries.electrical_series)
-                
-                #for i in timeseries.electrical_series:
-                    #print("i = ", i)
-                ###    print("timeseries.get_electrical_series(i) = ", timeseries.get_electrical_series(i))
-                #    print("timeseries.get_electrical_series(i).description = ", timeseries.get_electrical_series(i).description)
-                #    print("timeseries.get_electrical_series(i).comments = ", timeseries.get_electrical_series(i).comments)
-                ###    print("timeseries.get_electrical_series(i).rate = ", timeseries.get_electrical_series(i).rate)
-
-    #                description = timeseries.get_electrical_series(i).description
-
-#                    if timeseries.get_electrical_series(i).comments=='no comments':
-#                        print("No comments")
-#                    if timeseries.get_electrical_series(i).description=='no comments':
-#                        print("!!!!!!!!!!!! No description")
-            
-
-            #try:
             else:
                 try:
                 # NWB files created by Neo store the segment and block names in the comments field
                     hierarchy = json.loads(timeseries.comments)
-                #print("hierarchy = ", hierarchy)
-
-                    block_name = hierarchy["block"] ###
-                    segment_name = hierarchy["segment"] ###
-
+                    block_name = hierarchy["block"]
+                    segment_name = hierarchy["segment"]
                     description = try_json_field(timeseries.description)
-                #print("description = ", description)
-
-
                 except JSONDecodeError: # or timeseries.name=='LFP':
 #                # For NWB files created with other applications, we put everything in a single
 #                # segment in a single block
@@ -291,15 +240,9 @@ class NWBIO(BaseIO):
 #                #       e.g. using Trial information
                     block_name = "default"
                     segment_name = "default"
-
-                    description = try_json_field(timeseries.description)######
-                
-###            else: # Original
-###                block_name = hierarchy["block"]
-###                segment_name = hierarchy["segment"]
+                    description = try_json_field(timeseries.description)
             segment = self._get_segment(block_name, segment_name)
             annotations = {"nwb_group": group_name}
-#            description = try_json_field(timeseries.description) # Original
             if isinstance(description, dict):
                 annotations.update(description)
                 description = None
@@ -309,7 +252,6 @@ class NWBIO(BaseIO):
                     event = event.load()
                 segment.events.append(event)
                 event.segment = segment
-
 
             if timeseries.name!='Clustering': #'EventDetection': #'EventWaveform': #'LFP' or 'FilteredEphys' or 'FeatureExtraction':
 #            if timeseries.name=='pynwb.base.timeseries':
@@ -318,18 +260,14 @@ class NWBIO(BaseIO):
                 if isinstance(description, dict):
                     annotations.update(description)
                     description = None
-                
                 if isinstance(timeseries, AnnotationSeries):
                     event = EventProxy(timeseries, group_name)
                     if not lazy:
                         event = event.load()
                     segment.events.append(event)
                     event.segment = segment
-
-
                 elif timeseries.rate:  # AnalogSignal
                     signal = AnalogSignalProxy(timeseries, group_name)
-                    #print("signal = ", signal)
                     if not lazy:
                         signal = signal.load()
                     segment.analogsignals.append(signal)
@@ -338,7 +276,6 @@ class NWBIO(BaseIO):
                         return 0
                     else:
                         signal.segment = segment
-
                 else:  # IrregularlySampledSignal
                     signal = AnalogSignalProxy(timeseries, group_name)
                     if not lazy:
@@ -346,80 +283,8 @@ class NWBIO(BaseIO):
                     segment.irregularlysampledsignals.append(signal)
                     signal.segment = segment
 
-###            elif timeseries.rate:  # AnalogSignal
-###                signal = AnalogSignalProxy(timeseries, group_name)
-###                if not lazy:
-###                    signal = signal.load()
-###                segment.analogsignals.append(signal)
-###                signal.segment = segment
-   
-###            else:  # IrregularlySampledSignal
-###                signal = AnalogSignalProxy(timeseries, group_name)
-###                if not lazy:
-###                    signal = signal.load()
-###                segment.irregularlysampledsignals.append(signal)
-###                signal.segment = segment
-
-
-
-
-        
-        
-        
-        
-        """
-### Original ?!?
-        for timeseries in group.values():
-#            print("timeseries = ", timeseries)
-            print("loop timeseries")
-            try:
-#                print("loop try")
-#                if 'LFP':
-#                    print("------------Warning LFP")
-                # NWB files created by Neo store the segment and block names in the comments field
-                hierarchy = json.loads(timeseries.comments)
-#                print("hierarchy = ", hierarchy)
-#                print("timeseries.comments = ", timeseries.comments)
-            except JSONDecodeError:
-#                print("loop JSONDecodeError")
-                # For NWB files created with other applications, we put everything in a single
-                # segment in a single block
-                # todo: investigate whether there is a reliable way to create multiple segments,
-                #       e.g. using Trial information
-                block_name = "default"
-                segment_name = "default"
-            else:
-#                print("loop else")
-                block_name = hierarchy["block"]
-                segment_name = hierarchy["segment"]
-            segment = self._get_segment(block_name, segment_name)
-            annotations = {"nwb_group": group_name}
-            description = try_json_field(timeseries.description)
-            if isinstance(description, dict):
-                annotations.update(description)
-                description = None
-            if isinstance(timeseries, AnnotationSeries):
-                event = EventProxy(timeseries, group_name)
-                if not lazy:
-                    event = event.load()
-                segment.events.append(event)
-                event.segment = segment
-            elif timeseries.rate:  # AnalogSignal
-                signal = AnalogSignalProxy(timeseries, group_name)
-                if not lazy:
-                    signal = signal.load()
-                segment.analogsignals.append(signal)
-                signal.segment = segment
-            else:  # IrregularlySampledSignal
-                signal = AnalogSignalProxy(timeseries, group_name)
-                if not lazy:
-                    signal = signal.load()
-                segment.irregularlysampledsignals.append(signal)
-                signal.segment = segment
-        """
 
     def _read_units(self, lazy):
-#        print("*** def _read_units ***")
         if self._file.units:
             for id in self._file.units.id[:]:
                 try:
@@ -433,22 +298,16 @@ class NWBIO(BaseIO):
                     block_name = "default"
                 segment = self._get_segment(block_name, segment_name)
                 spiketrain = SpikeTrainProxy(self._file.units, id)
-                if not lazy: #######################
-                    spiketrain = spiketrain.load() #
+                if not lazy:
+                    spiketrain = spiketrain.load()
                 segment.spiketrains.append(spiketrain)
                 spiketrain.segment = segment
-#        print("End read units")
 
     def _read_acquisition_group(self, lazy):
-#        print("*** def -read_acquisition_group ***")
         self._read_timeseries_group("acquisition", lazy)
-#        print("self._read_timeseries_group(acquisition, lazy) = ", self._read_timeseries_group("acquisition", lazy))
 
     def _read_stimulus_group(self, lazy):
-#        print("*** def _read_stimulus_group ***")
         self._read_timeseries_group("stimulus", lazy)
-#        print("self._read_timeseries_group(stimulus, lazy) = ", self._read_timeseries_group("stimulus", lazy))
-#        print("end read stimulus group")
 
     def write_all_blocks(self, blocks, **kwargs):
         """
@@ -488,51 +347,76 @@ class NWBIO(BaseIO):
         # todo: store additional Neo annotations somewhere in NWB file
         nwbfile = NWBFile(**annotations)
 
+
+        device = nwbfile.create_device(name=' ')
+        # Intracellular electrode
+        ic_elec = nwbfile.create_icephys_electrode(
+                                    name="Electrode 0",
+                                    #name=annotation_name,
+                                    description='',
+                                    device=device,
+                                   )
+#        print("ic_elec = ", ic_elec)
+
+
         assert self.nwb_file_mode in ('w',)  # possibly expand to 'a'ppend later
         if self.nwb_file_mode == "w" and os.path.exists(self.filename):
             os.remove(self.filename)
         io_nwb = pynwb.NWBHDF5IO(self.filename, manager=get_manager(), mode=self.nwb_file_mode)
 
-        nwbfile.add_unit_column('_name', 'the name attribute of the SpikeTrain')
-        #nwbfile.add_unit_column('_description', 'the description attribute of the SpikeTrain')
-        nwbfile.add_unit_column(
-            'segment', 'the name of the Neo Segment to which the SpikeTrain belongs')
-        nwbfile.add_unit_column(
-            'block', 'the name of the Neo Block to which the SpikeTrain belongs')
-
-        nwbfile.add_epoch_column('_name', 'the name attribute of the Epoch')
-        #nwbfile.add_unit_column('_description', 'the description attribute of the SpikeTrain')
-        nwbfile.add_epoch_column(
-            'segment', 'the name of the Neo Segment to which the Epoch belongs')
-        nwbfile.add_epoch_column('block', 'the name of the Neo Block to which the Epoch belongs')
-
         for i, block in enumerate(blocks):
-            self.write_block(nwbfile, block)
+            self.write_block(nwbfile, block, device, ic_elec)
         io_nwb.write(nwbfile)
         io_nwb.close()
 
-    def write_block(self, nwbfile, block, **kwargs):
+    def write_block(self, nwbfile, block, device, ic_elec, **kwargs):
         """
         Write a Block to the file
             :param block: Block to be written
         """
+
         if not block.name:
             block.name = "block%d" % self.blocks_written
         for i, segment in enumerate(block.segments):
             assert segment.block is block
+
+            """vcs = VoltageClampSeries(
+                                name='%s' %block.segments,
+                                data=[0.1, 0.2, 0.3, 0.4, 0.5],
+                                #data=signal,
+                                #conversion=1e-12, 
+                                #resolution=np.nan, 
+                                #starting_time=234.5, 
+                                rate=20e3,
+                                #rate=float(sampling_rate),
+                                electrode=ic_elec, 
+                                #gain=0.02, 
+                                gain=1.,
+                                capacitance_fast=1.,#None,
+                                capacitance_slow=1.,#None,
+                                resistance_comp_bandwidth=1.,#None,
+                                resistance_comp_correction=1.,#None,
+                                resistance_comp_prediction=1.,#None,
+                                whole_cell_capacitance_comp=1.,#None,
+                                whole_cell_series_resistance_comp=1.,#None,
+                                sweep_number=1
+                                )"""
+
             if not segment.name:
                 segment.name = "%s : segment%d" % (block.name, i)
-            self._write_segment(nwbfile, segment)
+            self._write_segment(nwbfile, segment, device, ic_elec)
+        
+#        nwbfile.add_acquisition(vcs)
+
         self.blocks_written += 1
 
-    def _write_segment(self, nwbfile, segment):
+    def _write_segment(self, nwbfile, segment, device, ic_elec):
         # maybe use NWB trials to store Segment metadata?
-
         for i, signal in enumerate(chain(segment.analogsignals, segment.irregularlysampledsignals)):
             assert signal.segment is segment
             if not signal.name:
                 signal.name = "%s : analogsignal%d" % (segment.name, i)
-            self._write_signal(nwbfile, signal)
+            self._write_signal(nwbfile, signal, device, ic_elec)
 
         for i, train in enumerate(segment.spiketrains):
             assert train.segment is segment
@@ -551,57 +435,145 @@ class NWBIO(BaseIO):
                 epoch.name = "%s : epoch%d" % (segment.name, i)
             self._write_epoch(nwbfile, epoch)
 
-    def _write_signal(self, nwbfile, signal):
-#        print("*** def _write_signal ***")
+    def _write_signal(self, nwbfile, signal, device, ic_elec):
         hierarchy = {'block': signal.segment.block.name, 'segment': signal.segment.name}
+
         if isinstance(signal, AnalogSignal):
             sampling_rate = signal.sampling_rate.rescale("Hz")
-            tS = TimeSeries(name=signal.name,
-                            starting_time=time_in_seconds(signal.t_start),
+            """tS = TimeSeries(name=signal.name,
+                            starting_time=time_in_seconds(signal.t_start), #
                             data=signal,
-                            unit=signal.units.dimensionality.string,
+                            unit=signal.units.dimensionality.string, #
                             rate=float(sampling_rate),
-                            comments=json.dumps(hierarchy))
+                            comments=json.dumps(hierarchy))"""
                             # todo: try to add array_annotations via "control" attribute
-            print("tS AnalogSignal = ", tS)
+
+
+            """tS = PatchClampSeries(
+                name=signal.name, 
+                starting_time=time_in_seconds(signal.t_start), #
+                data=signal,
+                unit=signal.units.dimensionality.string,
+                rate=float(sampling_rate),
+                comments=json.dumps(hierarchy),
+                electrode=ic_elec, 
+                gain=1., 
+                #stimulus_description='NA',
+                #resolution=-1.0, 
+                #conversion=1.0, 
+                #timestamps=None, 
+                #starting_time=None, 
+                #description='no description', 
+                #control=None, 
+                #control_description=None, 
+                #sweep_number=None
+            )"""
+
+            tS = VoltageClampSeries(
+                                name=signal.name,
+                                data=signal,
+                                starting_time=time_in_seconds(signal.t_start),
+                                unit=signal.units.dimensionality.string,
+                                comments=json.dumps(hierarchy),
+                                rate=float(sampling_rate),
+                                electrode=ic_elec,
+                                gain=1.,
+                                #capacitance_fast=1.,#None,
+                                #capacitance_slow=1.,#None,
+                                #resistance_comp_bandwidth=1.,#None,
+                                #resistance_comp_correction=1.,#None,
+                                #resistance_comp_prediction=1.,#None,
+                                #whole_cell_capacitance_comp=1.,#None,
+                                #whole_cell_series_resistance_comp=1.,#None,
+                                #sweep_number=1
+                                )
+
+            """vcs = VoltageClampStimulusSeries(
+                                    name=signal.name, 
+                                    data=signal, 
+                                    #unit='A',
+                                    #starting_time=123.6, 
+                                    rate=1., 
+                                    electrode=ic_elec, 
+                                    gain=1., 
+                                    sweep_number=1
+                                   )"""
+            #nwbfile.add_stimulus(vcss)
+
+
+
         elif isinstance(signal, IrregularlySampledSignal):
-            tS = TimeSeries(name=signal.name,
+            """tS = TimeSeries(name=signal.name,
                             data=signal,
                             unit=signal.units.dimensionality.string,
                             timestamps=signal.times.rescale('second').magnitude,
-                            comments=json.dumps(hierarchy))
-            print("tS IrregularSampledSignal = ", tS)
+                            comments=json.dumps(hierarchy))"""
+
+            
+            tS = VoltageClampSeries(
+                                name=signal.name,
+                                data=signal,
+                                starting_time=time_in_seconds(signal.t_start),
+                                unit=signal.units.dimensionality.string,
+                                comments=json.dumps(hierarchy),
+                                #rate=float(sampling_rate),
+                                rate=1.0,
+                                electrode=ic_elec,
+                                gain=1.,
+                                #capacitance_fast=1.,#None,
+                                #capacitance_slow=1.,#None,
+                                #resistance_comp_bandwidth=1.,#None,
+                                #resistance_comp_correction=1.,#None,
+                                #resistance_comp_prediction=1.,#None,
+                                #whole_cell_capacitance_comp=1.,#None,
+                                #whole_cell_series_resistance_comp=1.,#None,
+                                #sweep_number=1
+                                )
+
+
+            """tS = VoltageClampStimulusSeries(
+                                    name=signal.name, 
+                                    data=signal, 
+                                    unit=signal.units.dimensionality.string,
+                                    timestamps=signal.times.rescale('second').magnitude,
+                                    comments=json.dumps(hierarchy),
+                                    #starting_time=123.6, 
+                                    #rate=1., 
+                                    electrode=ic_elec, 
+                                    gain=1., 
+                                    #sweep_number=1
+                                   )"""
+
+
+
         else:
             raise TypeError("signal has type {0}, should be AnalogSignal or IrregularlySampledSignal".format(
                 signal.__class__.__name__))
         nwb_group = signal.annotations.get("nwb_group", "acquisition")
         add_method_map = {
             "acquisition": nwbfile.add_acquisition,
-            "stimulus": nwbfile.add_stimulus
+            "stimulus": nwbfile.add_stimulus,
+#            "voltageclampseries": nwbfile.add_acquisition,
         }
         if nwb_group in add_method_map:
             add_time_series = add_method_map[nwb_group]
         else:
             raise NotImplementedError("NWB group '{}' not yet supported".format(nwb_group))
         add_time_series(tS)
+#        add_time_series(vcss)
         return tS
 
     def _write_spiketrain(self, nwbfile, spiketrain):
-#        print("*** _write_spiketrain ***")
         nwbfile.add_unit(spike_times=spiketrain.rescale('s').magnitude,
                          obs_intervals=[[float(spiketrain.t_start.rescale('s')),
                                          float(spiketrain.t_stop.rescale('s'))]],
-                         _name=spiketrain.name,
-                         # _description=spiketrain.description,
-                         segment=spiketrain.segment.name,
-                         block=spiketrain.segment.block.name)
+                         )
         # todo: handle annotations (using add_unit_column()?)
         # todo: handle Neo Units
         # todo: handle spike waveforms, if any (see SpikeEventSeries)
         return nwbfile.units
 
     def _write_event(self, nwbfile, event):
-#        print("*** def _write_event ***")
         hierarchy = {'block': event.segment.block.name, 'segment': event.segment.name}
         tS_evt = AnnotationSeries(
                         name=event.name,
@@ -609,28 +581,24 @@ class NWBIO(BaseIO):
                         timestamps=event.times.rescale('second').magnitude,
                         description=event.description or "",
                         comments=json.dumps(hierarchy))
+
         nwbfile.add_acquisition(tS_evt)
         return tS_evt
 
     def _write_epoch(self, nwbfile, epoch):
-#        print("***def _write_epoch ***")
         for t_start, duration, label in zip(epoch.rescale('s').magnitude,
                                             epoch.durations.rescale('s').magnitude,
                                             epoch.labels):
             nwbfile.add_epoch(t_start, t_start + duration, [label], [],
-                              _name=epoch.name,
-                              segment=epoch.segment.name,
-                              block=epoch.segment.block.name)
+                             )
         return nwbfile.epochs
 
 
 def time_in_seconds(t):
-#    print("*** def time_in_seconds ***")
     return float(t.rescale("second"))
 
 
 def _decompose_unit(unit):
-#    print("*** def _decompose_unit ***")
     assert isinstance(unit, pq.quantity.Quantity)
     assert unit.magnitude == 1
     conversion = 1.0
@@ -662,7 +630,6 @@ prefix_map = {
 class AnalogSignalProxy(BaseAnalogSignalProxy):
 
     def __init__(self, timeseries, nwb_group):
-#        print("*** def __init__ AnalogsignalProxy")
         self._timeseries = timeseries
         self.units = timeseries.unit
         if timeseries.starting_time is not None:
@@ -683,8 +650,7 @@ class AnalogSignalProxy(BaseAnalogSignalProxy):
             self.description = None
         
         if self._timeseries.data==None:
-            print("!!!!!!! Warning : No data !!! ")
-            print("!!! self._timeseries.data = ", self._timeseries.data)
+            print("Warning : No data ")
         else:
             self.shape = self._timeseries.data.shape ###
 
@@ -697,7 +663,6 @@ class AnalogSignalProxy(BaseAnalogSignalProxy):
                 Control if an error is raised or not when one of the time_slice members
                 (t_start or t_stop) is outside the real time range of the segment.
         """
-#        print("*** def load ***")
         if time_slice:
             i_start, i_stop, sig_t_start = self._time_slice_indices(time_slice,
                                                                     strict_slicing=strict_slicing)
@@ -708,27 +673,14 @@ class AnalogSignalProxy(BaseAnalogSignalProxy):
             else:
                 signal = self._timeseries.data[:]
                 sig_t_start = self.t_start
-        print("self.sampling_rate = ", self.sampling_rate)
         if self.sampling_rate is None:
-            ###
-            print("self.units = ", self.units)
 
             if self.units=='lumens':
                 #self.units=pq.sr*pq.cd
                 self.units=pq.J
-                print("self.units lumens = ", self.units)
 
             if self.units=='SIunit':
-                #import siunits as u
-                print("!!!!!!!!!!!!-----------!!!!!!!!!!!")
-                #self.units=pq.u
-                self.units=pq.Quantity(1)
-                print("self.units = ", self.units)
-            print("---- self.units IrregularSampledSignal = ", self.units)
-
-            #if self.units=='image_unit':
-            #    self.units=pq.Quantity(1)
-            #    print("--!!!-- self.units string = ", self.units)
+                self.units=pq.Quantity(1)            
 
             return IrregularlySampledSignal(
                         self._timeseries.timestamps[:] * pq.s,
@@ -742,16 +694,13 @@ class AnalogSignalProxy(BaseAnalogSignalProxy):
                         **self.annotations)  # todo: timeseries.control / control_description
 
         else:
+            
             if self.units=='lumens':
                 self.units=pq.J
-                print("self.units lumens = ", self.units)
 
             if self.units=='SIunit':
-                print("!!!!!!!!!!!!-----------!!!!!!!!!!!")
                 self.units=pq.Quantity(1)
-                print("self.units = ", self.units)
-            print("---- self.units AnalogSignal = ", self.units)
-
+            
             return AnalogSignal(
                         signal,
                         units=self.units,
@@ -766,7 +715,6 @@ class AnalogSignalProxy(BaseAnalogSignalProxy):
 class EventProxy(BaseEventProxy):
 
     def __init__(self, timeseries, nwb_group):
-#        print("*** def __init__ EventProxy ***")
         self._timeseries = timeseries
         self.name = timeseries.name
         self.annotations = {"nwb_group": nwb_group}
@@ -785,7 +733,6 @@ class EventProxy(BaseEventProxy):
                 Control if an error is raised or not when one of the time_slice members
                 (t_start or t_stop) is outside the real time range of the segment.
         """
-#        print("*** def load ***")
         if time_slice:
             raise NotImplementedError("todo")
         else:
@@ -801,7 +748,6 @@ class EventProxy(BaseEventProxy):
 class EpochProxy(BaseEpochProxy):
 
     def __init__(self, epochs_table, epoch_name=None, index=None):
-#        print("*** def __init__ EpochProxy ***")
         self._epochs_table = epochs_table
         if index is not None:
             self._index = index
@@ -820,24 +766,18 @@ class EpochProxy(BaseEpochProxy):
                 Control if an error is raised or not when one of the time_slice members
                 (t_start or t_stop) is outside the real time range of the segment.
         """
-#        print("*** def load ***")
         start_times = self._epochs_table.start_time[self._index]
         stop_times = self._epochs_table.stop_time[self._index]
         durations = stop_times - start_times
-        #labels = self._epochs_table.tags[self._index]
-
         return Epoch(times=start_times * pq.s,
                      durations=durations * pq.s,
-        #             labels=labels, ###################################
                      name=self.name)
 
 
 class SpikeTrainProxy(BaseSpikeTrainProxy):
 
     def __init__(self,  units_table, id):
-#        print("*** def __init__ SpikeTrainProxy ***")
         self._units_table = units_table
-        print("units_table = ", units_table)
         self.id = id
         self.units = pq.s
         t_start, t_stop = units_table.get_unit_obs_intervals(id)[0]
@@ -861,16 +801,14 @@ class SpikeTrainProxy(BaseSpikeTrainProxy):
                 Control if an error is raised or not when one of the time_slice members
                 (t_start or t_stop) is outside the real time range of the segment.
         """
-#        print("*** def load ***")
         interval = None
         if time_slice:
             interval = (float(t) for t in time_slice)  # convert from quantities
         spike_times = self._units_table.get_unit_spike_times(self.id, in_interval=interval)
         return SpikeTrain(
                     spike_times * self.units,
-                    self.t_stop,
+                    t_stop=self.t_stop,
                     units=self.units,
-                    #sampling_rate=array(1.) * Hz,
                     t_start=self.t_start,
                     #waveforms=None,
                     #left_sweep=None,
