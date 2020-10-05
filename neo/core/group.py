@@ -66,5 +66,7 @@ class Group(Container):
         for obj in objects:
             if self.allowed_types and not isinstance(obj, self.allowed_types):
                 raise TypeError("This Group can only contain {}".format(self.allowed_types))
-            container = self._container_lookup[obj.__class__.__name__]
+
+            obj_name = obj.__class__.__name__.replace('Proxy', '')
+            container = self._container_lookup[obj_name]
             container.append(obj)
