@@ -45,7 +45,7 @@ def _get_sampling_rate(sampling_rate, sampling_period):
     '''
     if sampling_period is None:
         if sampling_rate is None:
-            raise ValueError("You must provide either the sampling rate or " + "sampling period")
+            raise ValueError("You must provide either the sampling rate or sampling period")
     elif sampling_rate is None:
         sampling_rate = 1.0 / sampling_period
     elif sampling_period != 1.0 / sampling_rate:
