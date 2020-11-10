@@ -19,17 +19,11 @@ from neo.io.neuralynxio_v1 import NeuralynxIO as OldNeuralynxIO
 from neo import AnalogSignal
 
 
-class CommonNeuralynxIOTest(BaseTestIO, unittest.TestCase, ):
+class TestCheetah_v551(BaseTestIO, unittest.TestCase):
     ioclass = NeuralynxIO
-    files_to_test = [
-        # 'Cheetah_v4.0.2/original_data',
-        'Cheetah_v5.5.1/original_data',
-        'Cheetah_v5.6.3/original_data',
-        'Cheetah_v5.7.4/original_data',
-        'Pegasus_v2.1.1',
-        'Cheetah_v6.3.2/incomplete_blocks']
+    cheetah_version = '5.5.1'
+    files_to_test = ['Cheetah_v5.5.1/original_data']
     files_to_download = [
-        'Cheetah_v4.0.2/original_data/CSC14_trunc.Ncs',
         'Cheetah_v5.5.1/original_data/CheetahLogFile.txt',
         'Cheetah_v5.5.1/original_data/CheetahLostADRecords.txt',
         'Cheetah_v5.5.1/original_data/Events.nev',
@@ -43,42 +37,7 @@ class CommonNeuralynxIOTest(BaseTestIO, unittest.TestCase, ):
         'Cheetah_v5.5.1/plain_data/Tet3b.txt',
         'Cheetah_v5.5.1/plain_data/Events.txt',
         'Cheetah_v5.5.1/README.txt',
-        'Cheetah_v5.6.3/original_data/CheetahLogFile.txt',
-        'Cheetah_v5.6.3/original_data/CheetahLostADRecords.txt',
-        'Cheetah_v5.6.3/original_data/Events.nev',
-        'Cheetah_v5.6.3/original_data/CSC1.ncs',
-        'Cheetah_v5.6.3/original_data/CSC2.ncs',
-        'Cheetah_v5.6.3/original_data/TT1.ntt',
-        'Cheetah_v5.6.3/original_data/TT2.ntt',
-        'Cheetah_v5.6.3/original_data/VT1.nvt',
-        'Cheetah_v5.6.3/plain_data/Events.txt',
-        'Cheetah_v5.6.3/plain_data/CSC1.txt',
-        'Cheetah_v5.6.3/plain_data/CSC2.txt',
-        'Cheetah_v5.6.3/plain_data/TT1.txt',
-        'Cheetah_v5.6.3/plain_data/TT2.txt',
-        'Cheetah_v5.6.3/original_data/VT1.nvt',
-        'Cheetah_v5.7.4/original_data/CSC1.ncs',
-        'Cheetah_v5.7.4/original_data/CSC2.ncs',
-        'Cheetah_v5.7.4/original_data/CSC3.ncs',
-        'Cheetah_v5.7.4/original_data/CSC4.ncs',
-        'Cheetah_v5.7.4/original_data/CSC5.ncs',
-        'Cheetah_v5.7.4/original_data/Events.nev',
-        'Cheetah_v5.7.4/plain_data/CSC1.txt',
-        'Cheetah_v5.7.4/plain_data/CSC2.txt',
-        'Cheetah_v5.7.4/plain_data/CSC3.txt',
-        'Cheetah_v5.7.4/plain_data/CSC4.txt',
-        'Cheetah_v5.7.4/plain_data/CSC5.txt',
-        'Cheetah_v5.7.4/plain_data/Events.txt',
-        'Cheetah_v5.7.4/README.txt',
-        'Pegasus_v2.1.1/Events_0008.nev',
-        'Cheetah_v6.3.2/incomplete_blocks/CSC1_reduced.ncs',
-        'Cheetah_v6.3.2/incomplete_blocks/Events.nev',
-        'Cheetah_v6.3.2/incomplete_blocks/README.txt']
-
-
-class TestCheetah_v551(CommonNeuralynxIOTest, unittest.TestCase):
-    cheetah_version = '5.5.1'
-    files_to_test = []
+    ]
 
     def test_read_block(self):
         """Read data in a certain time range into one block"""
@@ -131,9 +90,26 @@ class TestCheetah_v551(CommonNeuralynxIOTest, unittest.TestCase):
         self.assertTrue(len(seg.events) > 0)
 
 
-class TestCheetah_v563(CommonNeuralynxIOTest, unittest.TestCase):
+class TestCheetah_v563(BaseTestIO, unittest.TestCase):
+    ioclass = NeuralynxIO
     cheetah_version = '5.6.3'
-    files_to_test = []
+    files_to_test = ['Cheetah_v5.6.3/original_data']
+    files_to_download = [
+        'Cheetah_v5.6.3/original_data/CheetahLogFile.txt',
+        'Cheetah_v5.6.3/original_data/CheetahLostADRecords.txt',
+        'Cheetah_v5.6.3/original_data/Events.nev',
+        'Cheetah_v5.6.3/original_data/CSC1.ncs',
+        'Cheetah_v5.6.3/original_data/CSC2.ncs',
+        'Cheetah_v5.6.3/original_data/TT1.ntt',
+        'Cheetah_v5.6.3/original_data/TT2.ntt',
+        'Cheetah_v5.6.3/original_data/VT1.nvt',
+        'Cheetah_v5.6.3/plain_data/Events.txt',
+        'Cheetah_v5.6.3/plain_data/CSC1.txt',
+        'Cheetah_v5.6.3/plain_data/CSC2.txt',
+        'Cheetah_v5.6.3/plain_data/TT1.txt',
+        'Cheetah_v5.6.3/plain_data/TT2.txt',
+        'Cheetah_v5.6.3/original_data/VT1.nvt',
+    ]
 
     def test_read_block(self):
         """Read data in a certain time range into one block"""
@@ -188,9 +164,25 @@ class TestCheetah_v563(CommonNeuralynxIOTest, unittest.TestCase):
         self.assertTrue(len(seg.events) > 0)
 
 
-class TestCheetah_v574(CommonNeuralynxIOTest, unittest.TestCase):
+class TestCheetah_v574(BaseTestIO, unittest.TestCase):
+    ioclass = NeuralynxIO
     cheetah_version = '5.7.4'
-    files_to_test = []
+    files_to_test = ['Cheetah_v5.7.4/original_data']
+    files_to_download = [
+        'Cheetah_v5.7.4/original_data/CSC1.ncs',
+        'Cheetah_v5.7.4/original_data/CSC2.ncs',
+        'Cheetah_v5.7.4/original_data/CSC3.ncs',
+        'Cheetah_v5.7.4/original_data/CSC4.ncs',
+        'Cheetah_v5.7.4/original_data/CSC5.ncs',
+        'Cheetah_v5.7.4/original_data/Events.nev',
+        'Cheetah_v5.7.4/plain_data/CSC1.txt',
+        'Cheetah_v5.7.4/plain_data/CSC2.txt',
+        'Cheetah_v5.7.4/plain_data/CSC3.txt',
+        'Cheetah_v5.7.4/plain_data/CSC4.txt',
+        'Cheetah_v5.7.4/plain_data/CSC5.txt',
+        'Cheetah_v5.7.4/plain_data/Events.txt',
+        'Cheetah_v5.7.4/README.txt',
+    ]
 
     def test_read_block(self):
         dirname = self.get_filename_path('Cheetah_v5.7.4/original_data')
@@ -219,9 +211,13 @@ class TestCheetah_v574(CommonNeuralynxIOTest, unittest.TestCase):
         self.assertEqual(len(block.groups), 1)
 
 
-class TestPegasus_v211(CommonNeuralynxIOTest, unittest.TestCase):
+class TestPegasus_v211(BaseTestIO, unittest.TestCase):
+    ioclass = NeuralynxIO
     pegasus_version = '2.1.1'
-    files_to_test = []
+    files_to_test = ['Pegasus_v2.1.1']
+    files_to_download = [
+        'Pegasus_v2.1.1/Events_0008.nev',
+    ]
 
     def test_read_block(self):
         dirname = self.get_filename_path('Pegasus_v2.1.1')
@@ -247,7 +243,63 @@ class TestPegasus_v211(CommonNeuralynxIOTest, unittest.TestCase):
         self.assertEqual(len(block.channel_indexes), 0)
 
 
-class TestData(CommonNeuralynxIOTest, unittest.TestCase):
+class TestData(BaseTestIO, unittest.TestCase):
+    ioclass = NeuralynxIO
+    files_to_test = [
+        'Cheetah_v5.5.1/original_data',
+        'Cheetah_v5.6.3/original_data',
+        'Cheetah_v5.7.4/original_data',
+        'Pegasus_v2.1.1',
+        'Cheetah_v6.3.2/incomplete_blocks'
+    ]
+    files_to_download = [
+        'Cheetah_v4.0.2/original_data/CSC14_trunc.Ncs',
+        'Cheetah_v5.5.1/original_data/CheetahLogFile.txt',
+        'Cheetah_v5.5.1/original_data/CheetahLostADRecords.txt',
+        'Cheetah_v5.5.1/original_data/Events.nev',
+        'Cheetah_v5.5.1/original_data/STet3a.nse',
+        'Cheetah_v5.5.1/original_data/STet3b.nse',
+        'Cheetah_v5.5.1/original_data/Tet3a.ncs',
+        'Cheetah_v5.5.1/original_data/Tet3b.ncs',
+        'Cheetah_v5.5.1/plain_data/STet3a.txt',
+        'Cheetah_v5.5.1/plain_data/STet3b.txt',
+        'Cheetah_v5.5.1/plain_data/Tet3a.txt',
+        'Cheetah_v5.5.1/plain_data/Tet3b.txt',
+        'Cheetah_v5.5.1/plain_data/Events.txt',
+        'Cheetah_v5.5.1/README.txt',
+        'Cheetah_v5.6.3/original_data/CheetahLogFile.txt',
+        'Cheetah_v5.6.3/original_data/CheetahLostADRecords.txt',
+        'Cheetah_v5.6.3/original_data/Events.nev',
+        'Cheetah_v5.6.3/original_data/CSC1.ncs',
+        'Cheetah_v5.6.3/original_data/CSC2.ncs',
+        'Cheetah_v5.6.3/original_data/TT1.ntt',
+        'Cheetah_v5.6.3/original_data/TT2.ntt',
+        'Cheetah_v5.6.3/original_data/VT1.nvt',
+        'Cheetah_v5.6.3/plain_data/Events.txt',
+        'Cheetah_v5.6.3/plain_data/CSC1.txt',
+        'Cheetah_v5.6.3/plain_data/CSC2.txt',
+        'Cheetah_v5.6.3/plain_data/TT1.txt',
+        'Cheetah_v5.6.3/plain_data/TT2.txt',
+        'Cheetah_v5.6.3/original_data/VT1.nvt',
+        'Cheetah_v5.7.4/original_data/CSC1.ncs',
+        'Cheetah_v5.7.4/original_data/CSC2.ncs',
+        'Cheetah_v5.7.4/original_data/CSC3.ncs',
+        'Cheetah_v5.7.4/original_data/CSC4.ncs',
+        'Cheetah_v5.7.4/original_data/CSC5.ncs',
+        'Cheetah_v5.7.4/original_data/Events.nev',
+        'Cheetah_v5.7.4/plain_data/CSC1.txt',
+        'Cheetah_v5.7.4/plain_data/CSC2.txt',
+        'Cheetah_v5.7.4/plain_data/CSC3.txt',
+        'Cheetah_v5.7.4/plain_data/CSC4.txt',
+        'Cheetah_v5.7.4/plain_data/CSC5.txt',
+        'Cheetah_v5.7.4/plain_data/Events.txt',
+        'Cheetah_v5.7.4/README.txt',
+        'Pegasus_v2.1.1/Events_0008.nev',
+        'Cheetah_v6.3.2/incomplete_blocks/CSC1_reduced.ncs',
+        'Cheetah_v6.3.2/incomplete_blocks/Events.nev',
+        'Cheetah_v6.3.2/incomplete_blocks/README.txt']
+
+
     # def test_ncs(self):
     #     for session in self.files_to_test[1:2]:  # in the long run this should include all files
     #         dirname = self.get_filename_path(session)
@@ -293,7 +345,15 @@ class TestData(CommonNeuralynxIOTest, unittest.TestCase):
                 np.testing.assert_allclose(plain_data[:overlap], times[:overlap], rtol=1e-10)
 
 
-class TestIncompleteBlocks(CommonNeuralynxIOTest, unittest.TestCase):
+class TestIncompleteBlocks(BaseTestIO, unittest.TestCase):
+    ioclass = NeuralynxIO
+    files_to_test = ['Cheetah_v6.3.2/incomplete_blocks']
+    files_to_download = [
+        'Cheetah_v6.3.2/incomplete_blocks/CSC1_reduced.ncs',
+        'Cheetah_v6.3.2/incomplete_blocks/Events.nev',
+        'Cheetah_v6.3.2/incomplete_blocks/README.txt'
+    ]
+
     def test_incomplete_block_handling_v632(self):
         dirname = self.get_filename_path('Cheetah_v6.3.2/incomplete_blocks')
         nio = NeuralynxIO(dirname=dirname, use_cache=False)
@@ -312,7 +372,42 @@ class TestIncompleteBlocks(CommonNeuralynxIOTest, unittest.TestCase):
             self.assertEqual(np.round(t, 4), np.round(gt, 4))
 
 
-class TestGaps(CommonNeuralynxIOTest, unittest.TestCase):
+class TestGaps(BaseTestIO, unittest.TestCase):
+    ioclass = NeuralynxIO
+    files_to_test = [
+        'Cheetah_v5.5.1/original_data',
+        'Cheetah_v5.6.3/original_data',
+    ]
+    files_to_download = [
+        'Cheetah_v5.5.1/original_data/CheetahLogFile.txt',
+        'Cheetah_v5.5.1/original_data/CheetahLostADRecords.txt',
+        'Cheetah_v5.5.1/original_data/Events.nev',
+        'Cheetah_v5.5.1/original_data/STet3a.nse',
+        'Cheetah_v5.5.1/original_data/STet3b.nse',
+        'Cheetah_v5.5.1/original_data/Tet3a.ncs',
+        'Cheetah_v5.5.1/original_data/Tet3b.ncs',
+        'Cheetah_v5.5.1/plain_data/STet3a.txt',
+        'Cheetah_v5.5.1/plain_data/STet3b.txt',
+        'Cheetah_v5.5.1/plain_data/Tet3a.txt',
+        'Cheetah_v5.5.1/plain_data/Tet3b.txt',
+        'Cheetah_v5.5.1/plain_data/Events.txt',
+        'Cheetah_v5.5.1/README.txt',
+        'Cheetah_v5.6.3/original_data/CheetahLogFile.txt',
+        'Cheetah_v5.6.3/original_data/CheetahLostADRecords.txt',
+        'Cheetah_v5.6.3/original_data/Events.nev',
+        'Cheetah_v5.6.3/original_data/CSC1.ncs',
+        'Cheetah_v5.6.3/original_data/CSC2.ncs',
+        'Cheetah_v5.6.3/original_data/TT1.ntt',
+        'Cheetah_v5.6.3/original_data/TT2.ntt',
+        'Cheetah_v5.6.3/original_data/VT1.nvt',
+        'Cheetah_v5.6.3/plain_data/Events.txt',
+        'Cheetah_v5.6.3/plain_data/CSC1.txt',
+        'Cheetah_v5.6.3/plain_data/CSC2.txt',
+        'Cheetah_v5.6.3/plain_data/TT1.txt',
+        'Cheetah_v5.6.3/plain_data/TT2.txt',
+        'Cheetah_v5.6.3/original_data/VT1.nvt',
+    ]
+
     def test_gap_handling_v551(self):
         dirname = self.get_filename_path('Cheetah_v5.5.1/original_data')
         nio = NeuralynxIO(dirname=dirname, use_cache=False)
