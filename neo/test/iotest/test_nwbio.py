@@ -30,10 +30,8 @@ class TestNWBIO(unittest.TestCase):
     ioclass = NWBIO
     files_to_download = [
         #        Files from Allen Institute :
-        # "http://download.alleninstitute.org/informatics-archive/prerelease/H19.28.012.11.05-2.nwb",  # 64 MB
-
-        #       Files from PyNWB Test Data
-        "/Users/legouee/NWBwork/my_notebook/neo_test.nwb" # Issue 796
+#         "http://download.alleninstitute.org/informatics-archive/prerelease/H19.28.012.11.05-2.nwb",  # 64 MB
+         "/Users/legouee/Desktop/NWB/NWB_files/Allen_Institute/H19.28.012.11.05-2.nwb",
     ]
 
     def test_read(self):
@@ -42,13 +40,10 @@ class TestNWBIO(unittest.TestCase):
 
 #        for url in self.files_to_download:
 #            local_filename = os.path.join(self.local_test_dir, url.split("/")[-1])
-#            print("local_filename = ", local_filename)
-#            print("self.local_test_dir = ", self.local_test_dir)
-#
 #            if not os.path.exists(local_filename):
 #                try:
-####                    urlretrieve(url, self.local_filename[0])
-#                    urlretrieve(url, local_filename) # Original
+#                    urlretrieve(url, self.local_filename[0])
+##                    urlretrieve(url, local_filename) #
 #                except IOError as exc:
 #                    raise unittest.TestCase.failureException(exc)
 #            io = NWBIO(local_filename, 'r')
@@ -139,31 +134,50 @@ class TestNWBIO(unittest.TestCase):
         ior = NWBIO(filename=test_file_name, mode='r')
         retrieved_blocks = ior.read_all_blocks()
 
+        self.assertEqual(len(retrieved_blocks), 3)
         self.assertEqual(len(retrieved_blocks[2].segments), num_seg)
 
         original_signal_22b = original_blocks[2].segments[2].analogsignals[1]
-        for attr_name in ("name", "units", "sampling_rate", "t_start"): 
+        retrieved_signal_22b = retrieved_blocks[2].segments[2].analogsignals[1]
+        for attr_name in ("name", "units", "sampling_rate", "t_start"):
+            retrieved_attribute = getattr(retrieved_signal_22b, attr_name)
             original_attribute = getattr(original_signal_22b, attr_name)
+            self.assertEqual(retrieved_attribute, original_attribute)
+        assert_array_equal(retrieved_signal_22b.magnitude, original_signal_22b.magnitude)
 
         original_issignal_22d = original_blocks[2].segments[2].irregularlysampledsignals[0]
-        for attr_name in ("name", "units", "t_start"): 
+        retrieved_issignal_22d = retrieved_blocks[2].segments[2].irregularlysampledsignals[0]
+        for attr_name in ("name", "units", "t_start"):
+            retrieved_attribute = getattr(retrieved_issignal_22d, attr_name)
             original_attribute = getattr(original_issignal_22d, attr_name)
+            self.assertEqual(retrieved_attribute, original_attribute)
+        assert_array_equal(retrieved_issignal_22d.times.rescale('ms').magnitude,
+                           original_issignal_22d.times.rescale('ms').magnitude)
+        assert_array_equal(retrieved_issignal_22d.magnitude, original_issignal_22d.magnitude)
 
         original_event_11 = original_blocks[1].segments[1].events[0]
         retrieved_event_11 = retrieved_blocks[1].segments[1].events[0]
         for attr_name in ("name",):
             retrieved_attribute = getattr(retrieved_event_11, attr_name)
             original_attribute = getattr(original_event_11, attr_name)
+            self.assertEqual(retrieved_attribute, original_attribute)
         assert_array_equal(retrieved_event_11.rescale('ms').magnitude,
                            original_event_11.rescale('ms').magnitude)
         assert_array_equal(retrieved_event_11.labels, original_event_11.labels)
 
         original_spiketrain_131 = original_blocks[1].segments[1].spiketrains[1]
+        retrieved_spiketrain_131 = retrieved_blocks[1].segments[1].spiketrains[1]
         for attr_name in ("name", "t_start", "t_stop"):
+            retrieved_attribute = getattr(retrieved_spiketrain_131, attr_name)
             original_attribute = getattr(original_spiketrain_131, attr_name)
+            self.assertEqual(retrieved_attribute, original_attribute)
+        assert_array_equal(retrieved_spiketrain_131.times.rescale('ms').magnitude,
+                           original_spiketrain_131.times.rescale('ms').magnitude)
 
         original_epoch_11 = original_blocks[1].segments[1].epochs[0]
+        retrieved_epoch_11 = retrieved_blocks[1].segments[1].epochs[0]
         for attr_name in ("name",):
+            retrieved_attribute = getattr(retrieved_epoch_11, attr_name)
             original_attribute = getattr(original_epoch_11, attr_name)
             self.assertEqual(retrieved_attribute, original_attribute)
         assert_array_equal(retrieved_epoch_11.rescale('ms').magnitude,
@@ -172,6 +186,7 @@ class TestNWBIO(unittest.TestCase):
                         original_epoch_11.durations.rescale('ms').magnitude)
         assert_array_equal(retrieved_epoch_11.labels, original_epoch_11.labels)
         os.remove(test_file_name)
+
 
     def test_roundtrip_with_annotations(self):
         # test with NWB-specific annotations
@@ -186,30 +201,52 @@ class TestNWBIO(unittest.TestCase):
             "description": "intracellular electrode",
             "device": {
                 "name": "electrode #1"
-            }
+            },
+        }
+
+        sweep_number_annotations = {
+            "name": ("pynwb.icephys", "SweepTable"),
+            "description": "Description of the SweepTable",
+            "id": 1.0,
+            "columns":1,
+#            "columns": {
+#                "series_index":1,
+#                "series":1,
+#                "sweep_number":1.0,
+#            },
+            "colnames":1,
+#            "colnames": "sweep_number",
+#            "colnames": {
+#                "series",
+#                "sweep_number",
+#            },
+        #    "series_index":"series"
         }
         stimulus_annotations = {
             "nwb_group": "stimulus",
             "nwb_type": ("pynwb.icephys", "CurrentClampStimulusSeries"),
             "nwb_electrode": electrode_annotations,
-            "nwb:sweep_number": 1,
-            "nwb:gain": 1.0
+#            "nwb:sweep_number": 1,
+            "nwb_sweep_number": sweep_number_annotations,
+            "nwb:gain": 1.0,
         }
         response_annotations = {
             "nwb_group": "acquisition",
             "nwb_type": ("pynwb.icephys", "CurrentClampSeries"),
             "nwb_electrode": electrode_annotations,
-            "nwb:sweep_number": 1,
+#            "nwb:sweep_number": 1,
+            "nwb_sweep_number": sweep_number_annotations,
             "nwb:gain": 1.0,
             "nwb:bias_current": 1e-12,
             "nwb:bridge_balance": 70e6,
-            "nwb:capacitance_compensation": 1e-12
+            "nwb:capacitance_compensation": 1e-12,
         }
         stimulus = AnalogSignal(np.random.randn(100, 1) * pq.nA,
                                 sampling_rate=5 * pq.kHz,
                                 t_start=50 * pq.ms,
                                 name="stimulus",
-                                **stimulus_annotations)
+                                **stimulus_annotations
+                                )
         response = AnalogSignal(np.random.randn(100, 1) * pq.mV,
                                 sampling_rate=5 * pq.kHz,
                                 t_start=50 * pq.ms,
