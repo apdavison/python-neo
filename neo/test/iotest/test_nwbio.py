@@ -224,7 +224,7 @@ class TestNWBIO(unittest.TestCase):
         }
         stimulus_annotations = {
             "nwb_group": "stimulus",
-            "nwb_type": ("pynwb.icephys", "CurrentClampStimulusSeries"),
+            "nwb_neurodata_type": ("pynwb.icephys", "CurrentClampStimulusSeries"),
             "nwb_electrode": electrode_annotations,
 #            "nwb:sweep_number": 1,
             "nwb_sweep_number": sweep_number_annotations,
@@ -232,7 +232,7 @@ class TestNWBIO(unittest.TestCase):
         }
         response_annotations = {
             "nwb_group": "acquisition",
-            "nwb_type": ("pynwb.icephys", "CurrentClampSeries"),
+            "nwb_neurodata_type": ("pynwb.icephys", "CurrentClampSeries"),
             "nwb_electrode": electrode_annotations,
 #            "nwb:sweep_number": 1,
             "nwb_sweep_number": sweep_number_annotations,

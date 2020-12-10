@@ -4,13 +4,14 @@ NWBIO
 
 IO class for reading data from a Neurodata Without Borders (NWB) dataset
 
-Documentation : https://neurodatawithoutborders.github.io
+Documentation : https://www.nwb.org/
 Depends on: h5py, nwb, dateutil
 Supported: Read, Write
 Specification - https://github.com/NeurodataWithoutBorders/specification
-Python APIs - (1) https://github.com/AllenInstitute/nwb-api/tree/master/ainwb
-	          (2) https://github.com/AllenInstitute/AllenSDK/blob/master/allensdk/core/nwb_data_set.py
-              (3) https://github.com/NeurodataWithoutBorders/api-python
+Python APIs - (1) https://github.com/NeurodataWithoutBorders/pynwb
+              (2) https://github.com/AllenInstitute/nwb-api/tree/master/ainwb
+	          (3) https://github.com/AllenInstitute/AllenSDK/blob/master/allensdk/core/nwb_data_set.py
+              (4) https://github.com/NeurodataWithoutBorders/api-python
 Sample datasets from CRCNS - https://crcns.org/NWB
 Sample datasets from Allen Institute - http://alleninstitute.github.io/AllenSDK/cell_types.html#neurodata-without-borders
 """
@@ -137,7 +138,6 @@ def statistics(block):  # todo: move this to be a property of Block
         stats["IrregularlySampledSignal"]["count"] += len(segment.irregularlysampledsignals)
         stats["Epoch"]["count"] += len(segment.epochs)
         stats["Event"]["count"] += len(segment.events)
-###        stats["ImageSequence"]["count"] += len(segment.imagesequence)
     return stats
 
 
@@ -237,8 +237,6 @@ class NWBIO(BaseIO):
         """
         if not have_pynwb:
             raise Exception("Please install the pynwb package to use NWBIO")
-        if not have_hdmf:
-            raise Exception("Please install the hdmf package to use NWBIO")
         BaseIO.__init__(self, filename=filename)
         self.filename = filename
         self.blocks_written = 0
@@ -407,7 +405,8 @@ class NWBIO(BaseIO):
         Write list of blocks to the file
         """
         # todo: allow metadata in NWBFile constructor to be taken from kwargs
-        start_time = datetime.now()
+  
+        start_time = datetime.now() ######
         annotations = defaultdict(set)
         for annotation_name in GLOBAL_ANNOTATIONS:
             if annotation_name in kwargs:
@@ -435,7 +434,9 @@ class NWBIO(BaseIO):
             annotations["session_description"] = blocks[0].description or self.filename
             # todo: concatenate descriptions of multiple blocks if different
         if "session_start_time" not in annotations:
+######            raise Exception("The start time of the session is missing.") ###
             annotations["session_start_time"] = datetime.now()
+
         # todo: handle subject
         # todo: store additional Neo annotations somewhere in NWB file
         nwbfile = NWBFile(**annotations)
@@ -483,6 +484,7 @@ class NWBIO(BaseIO):
         electrodes = {}
         devices = {}
         nwb_sweep_tables = {}
+
         for segment in block.segments:
             for signal in chain(segment.analogsignals, segment.irregularlysampledsignals):
                 if "nwb_electrode" in signal.annotations:
@@ -528,8 +530,8 @@ class NWBIO(BaseIO):
     def _write_signal(self, nwbfile, signal, electrodes):
         hierarchy = {'block': signal.segment.block.name, 'segment': signal.segment.name}
 
-        if "nwb_type" in signal.annotations:
-            timeseries_class = get_class(*signal.annotations["nwb_type"])
+        if "nwb_neurodata_type" in signal.annotations:
+            timeseries_class = get_class(*signal.annotations["nwb_neurodata_type"])
         else:
             timeseries_class = TimeSeries  # default
 
@@ -552,7 +554,7 @@ class NWBIO(BaseIO):
 
         if isinstance(signal, AnalogSignal):
             sampling_rate = signal.sampling_rate.rescale("Hz")
-            nwb_sweep_number = signal.annotations.get("nwb_sweep_number", "nwb_type")
+            nwb_sweep_number = signal.annotations.get("nwb_sweep_number", "nwb_neurodata_type")
             tS = timeseries_class(
                 name=signal.name,
                 starting_time=time_in_seconds(signal.t_start),
@@ -677,7 +679,7 @@ class AnalogSignalProxy(BaseAnalogSignalProxy):
             value = getattr(timeseries, field_name)
             if value is not None:
                 self.annotations[f"nwb:{field_name}"] = value
-        self.annotations["nwb_type"] = (
+        self.annotations["nwb_neurodata_type"] = (
             timeseries.__class__.__module__,
             timeseries.__class__.__name__
         )
@@ -698,10 +700,6 @@ class AnalogSignalProxy(BaseAnalogSignalProxy):
                 if value is not None:
                     electrode_metadata["device"][field_name] = value
             self.annotations["nwb_electrode"] = electrode_metadata
-        
-        if hasattr(timeseries, "image"):
-            print("image")
-
 
     def load(self, time_slice=None, strict_slicing=True):
         """
