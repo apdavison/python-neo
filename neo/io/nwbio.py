@@ -55,7 +55,6 @@ try:
     from pynwb.image import ImageSeries
     from pynwb.spec import NWBAttributeSpec, NWBDatasetSpec, NWBGroupSpec, NWBNamespace, NWBNamespaceBuilder
     from pynwb.device import Device
-    # For calcium imaging data
     from pynwb.ophys import TwoPhotonSeries, OpticalChannel, ImageSegmentation, Fluorescence
     have_pynwb = True
 except ImportError:
@@ -131,6 +130,7 @@ def statistics(block):  # todo: move this to be a property of Block
         "IrregularlySampledSignal": {"count": 0},
         "Epoch": {"count": 0},
         "Event": {"count": 0},
+        "ImageSequence": {"count": 0},
     }
     for segment in block.segments:
         stats["SpikeTrain"]["count"] += len(segment.spiketrains)
@@ -138,6 +138,7 @@ def statistics(block):  # todo: move this to be a property of Block
         stats["IrregularlySampledSignal"]["count"] += len(segment.irregularlysampledsignals)
         stats["Epoch"]["count"] += len(segment.epochs)
         stats["Event"]["count"] += len(segment.events)
+        stats["ImageSequence"]["count"] += len(segment.imagesequences)
     return stats
 
 
@@ -340,7 +341,7 @@ class NWBIO(BaseIO):
     
     def _read_timeseries_group(self, group_name, lazy):
         group = getattr(self._file, group_name)
-        for timeseries in group.values():     
+        for timeseries in group.values():
             try:
                 # NWB files created by Neo store the segment and block names in the comments field
                 hierarchy = json.loads(timeseries.comments)
@@ -362,6 +363,8 @@ class NWBIO(BaseIO):
                     event = event.load()
                 segment.events.append(event)
                 event.segment = segment
+            elif isinstance(timeseries, TwoPhotonSeries): # ImageSequences
+                self._read_images(timeseries, segment, lazy)   
             elif timeseries.rate:  # AnalogSignal
                 signal = AnalogSignalProxy(timeseries, group_name)
                 if not lazy:
@@ -374,6 +377,77 @@ class NWBIO(BaseIO):
                     signal = signal.load()
                 segment.irregularlysampledsignals.append(signal)
                 signal.segment = segment
+
+    def _read_images(self, timeseries, segment, lazy):
+        # Only TwoPhotonSeries with data as an array, not a picture file, is handle
+        if timeseries.data:
+            sampling_rate = timeseries.imaging_plane.imaging_rate
+            units = timeseries.imaging_plane.unit
+            seg = Segment(name='segment')
+            size_x = timeseries.data.shape[1]
+            size_y = timeseries.data.shape[2]
+            size = timeseries.data.shape[0]
+
+            image_data=[[[column for column in range(size_x)]for row in range(size_y)] for frame in range(size)]
+
+            spatial_scale_unit = timeseries.imaging_plane.grid_spacing_unit
+            spatial_scale='No spatial_scale'       #to do 
+
+            attr_image={"name", "dimension", "external_file", "imaging_plane", "starting_frame", "format", "starting_time", "rate", "unit"}
+            attr_ImagePlan={"name", "optical_channel", "description", "device", "excitation_lambda", "imaging_rate", "indicator", "location", "reference_frame"}#, "grid_spacing"}
+            attr_optical={"name" , "description", "emission_lambda"}
+            attr_Device={"name", "description", "manufacturer"}
+
+            self.global_dict_image_metadata = {}
+            self.global_dict_image_metadata["nwb_neurodata_type"] = (
+                timeseries.__class__.__module__,
+                timeseries.__class__.__name__
+            )       
+            for attr in attr_image:
+                value_image = getattr(timeseries, attr)
+                if attr=="imaging_plane":
+                    dict_ImagePlan = {}
+                    for iattr_imgPlan in attr_ImagePlan:
+                        value_image_imgPlan = getattr(value_image,iattr_imgPlan)
+                        
+                        if iattr_imgPlan=="optical_channel":
+                            dict_optical = {}
+                            for iattr_optical in attr_optical:
+                                value_image_optical = getattr(value_image_imgPlan[0],iattr_optical)
+                                dict_optical[iattr_optical] = value_image_optical
+                            dict_ImagePlan[iattr_imgPlan] = dict_optical
+
+                        if iattr_imgPlan=="device":
+                            dict_Device = {}
+                            for iattr_device in attr_Device:
+                                value_image_device = getattr(value_image_imgPlan, iattr_device)
+                                dict_Device[iattr_device] = value_image_device
+                            dict_ImagePlan[iattr_imgPlan] = dict_Device
+                            
+                        if iattr_imgPlan=="optical_channel" or iattr_imgPlan=="device":
+                            pass
+
+                        else:
+                            dict_ImagePlan[iattr_imgPlan] = value_image_imgPlan
+
+                    value_image = dict_ImagePlan
+
+                if value_image is not None:
+                    self.global_dict_image_metadata[attr] = value_image
+
+            if sampling_rate is None:
+                sampling_rate=1
+            
+            image_sequence = ImageSequence(
+                                        image_data,
+                                        units=units,
+                                        sampling_rate=sampling_rate*pq.Hz, 
+                                        spatial_scale=spatial_scale,
+                                        **self.global_dict_image_metadata
+                                        )
+            segment.imagesequences.append(image_sequence)
+            image_sequence.segment = seg
+
 
     def _read_units(self, lazy):
         if self._file.units:
@@ -406,7 +480,7 @@ class NWBIO(BaseIO):
         """
         # todo: allow metadata in NWBFile constructor to be taken from kwargs
   
-        start_time = datetime.now() ######
+        start_time = datetime.now()
         annotations = defaultdict(set)
         for annotation_name in GLOBAL_ANNOTATIONS:
             if annotation_name in kwargs:
@@ -434,7 +508,6 @@ class NWBIO(BaseIO):
             annotations["session_description"] = blocks[0].description or self.filename
             # todo: concatenate descriptions of multiple blocks if different
         if "session_start_time" not in annotations:
-######            raise Exception("The start time of the session is missing.") ###
             annotations["session_start_time"] = datetime.now()
 
         # todo: handle subject
@@ -473,17 +546,21 @@ class NWBIO(BaseIO):
         if not block.name:
             block.name = "block%d" % self.blocks_written
         for i, segment in enumerate(block.segments):
+            if segment.block is None:
+                print("No more segment")
+                return
             assert segment.block is block
             if not segment.name:
                 segment.name = "%s : segment%d" % (block.name, i)
+            ### assert image.segment is segment ###
             self._write_segment(nwbfile, segment, electrodes)
         self.blocks_written += 1
 
     def _write_electrodes(self, nwbfile, block):
-        # this handles only icephys_electrode for now
         electrodes = {}
         devices = {}
         nwb_sweep_tables = {}
+        img_seg = ImageSegmentation()
 
         for segment in block.segments:
             for signal in chain(segment.analogsignals, segment.irregularlysampledsignals):
@@ -507,8 +584,14 @@ class NWBIO(BaseIO):
         for i, signal in enumerate(chain(segment.analogsignals, segment.irregularlysampledsignals)):
             assert signal.segment is segment
             if not signal.name:
-                signal.name = "%s : analogsignal%d" % (segment.name, i)
+                signal.name = "%s : analogsignal%d %i" % (segment.name, i, i)
             self._write_signal(nwbfile, signal, electrodes)
+        
+        for i, image in enumerate(segment.imagesequences):
+            #assert image.segment is segment
+            if not image.name:
+                image.name = "%s : image%d" % (segment.name, i)
+            self._write_image(nwbfile, image)
 
         for i, train in enumerate(segment.spiketrains):
             assert train.segment is segment
@@ -526,6 +609,54 @@ class NWBIO(BaseIO):
             if not epoch.name:
                 epoch.name = "%s : epoch%d" % (segment.name, i)
             self._write_epoch(nwbfile, epoch)
+
+
+    def _write_image(self, nwbfile, image):
+        """
+        Referring to ImageSequence for Neo
+        and to ophys for pynwb
+        """
+        # Only TwoPhotonSeries with data as an array, not a picture file, is handle
+        image_sequence_data=np.array([image.shape[0], image.shape[1], image.shape[2]])
+
+        if "nwb_neurodata_type" in image.annotations:
+            device = nwbfile.create_device(
+                    name=annotations['imaging_plane']['device']['name'],
+                    description=annotations['imaging_plane']['device']['description'],
+                    manufacturer=annotations['imaging_plane']['device']['manufacturer'],
+                    )
+
+            optical_channel = OpticalChannel( 
+                                name=annotations['imaging_plane']['optical_channel']['name'],
+                                description=annotations['imaging_plane']['optical_channel']['description'], #image.description,
+                                emission_lambda=annotations['imaging_plane']['optical_channel']['emission_lambda']  #TO IMPROVE
+                            )
+
+            imaging_plane = nwbfile.create_imaging_plane(
+                            name=annotations['imaging_plane']['name'],
+                            optical_channel=optical_channel,
+                            imaging_rate=annotations['imaging_plane']['imaging_rate'],
+                            description=annotations['imaging_plane']['description'],
+                            device=device,
+                            excitation_lambda=annotations['imaging_plane']['excitation_lambda'],
+                            indicator=annotations['imaging_plane']['indicator'],
+                            location=annotations['imaging_plane']['location'],
+                        )
+
+            image_series = TwoPhotonSeries(
+                name=annotations['name'],
+                data=image_sequence_data,
+                imaging_plane=imaging_plane,
+                rate=annotations['rate'], 
+                unit=annotations['unit']         
+            )
+
+            nwbfile.add_acquisition(image_series)
+        
+        else:
+            imaging_plane = None
+            pass
+
 
     def _write_signal(self, nwbfile, signal, electrodes):
         hierarchy = {'block': signal.segment.block.name, 'segment': signal.segment.name}
@@ -644,7 +775,7 @@ class AnalogSignalProxy(BaseAnalogSignalProxy):
     common_metadata_fields = (
         # fields that are the same for all TimeSeries subclasses
         "comments", "description", "unit", "starting_time", "timestamps", "rate",
-        "data", "starting_time_unit", "timestamps_unit", "electrode",
+        "data", "starting_time_unit", "timestamps_unit", "electrode"
     )
 
     def __init__(self, timeseries, nwb_group):
@@ -860,3 +991,22 @@ class SpikeTrainProxy(BaseSpikeTrainProxy):
                     array_annotations=None, #
                     id=self.id, ###
                     **self.annotations)
+
+class ImageSequenceProxy(BaseAnalogSignalProxy):
+    def __init__(self, timeseries, nwb_group):
+        self._timeseries = timeseries
+    
+    def load(self, time_slice=None, strict_slicing=True):
+        if time_slice:
+            i_start, i_stop, sig_t_start = self._time_slice_indices(time_slice, strict_slicing=strict_slicing)
+            signal = self._timeseries.data[i_start: i_stop]
+        else:            
+            signal = self._timeseries.data[:]
+            sig_t_start = self.t_start
+        return ImageSequence(
+                            [[[column for column in range(10)]for row in range(10)] for frame in range(10)],
+                            units=self.units,
+                            sampling_rate=timeseries.rate*pq.Hz, 
+                            spatial_scale=timeseries.spatial_scale*pq.micrometer,
+                            )
+    

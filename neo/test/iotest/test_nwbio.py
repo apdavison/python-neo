@@ -31,7 +31,8 @@ class TestNWBIO(unittest.TestCase):
     files_to_download = [
         #        Files from Allen Institute :
 #         "http://download.alleninstitute.org/informatics-archive/prerelease/H19.28.012.11.05-2.nwb",  # 64 MB
-         "/Users/legouee/Desktop/NWB/NWB_files/Allen_Institute/H19.28.012.11.05-2.nwb",
+###         "/Users/legouee/Desktop/NWB/NWB_files/Allen_Institute/H19.28.012.11.05-2.nwb",
+         "/Users/legouee/NWBwork/NeurodataWithoutBorders/nwb_tutorial/HCK09/ophys_tutorial.nwb",
     ]
 
     def test_read(self):
@@ -105,6 +106,16 @@ class TestNWBIO(unittest.TestCase):
                              durations=[9, 3, 8] * pq.ms,
                              labels=np.array(['btn3', 'btn4', 'btn5']))
 
+                # Image Sequence
+                img_sequence_array = [[[column for column in range(num_chan)]for row in range(num_seg)] for frame in range(num_chan)]
+                image_sequence = ImageSequence(img_sequence_array, 
+                                           units='V',
+                                           sampling_rate=1*pq.Hz, 
+                                           spatial_scale=1*pq.micrometer
+                                           )
+
+                seg.imagesequences.append(image_sequence)
+
                 seg.spiketrains.append(train)
                 seg.spiketrains.append(train2)
 
@@ -114,8 +125,11 @@ class TestNWBIO(unittest.TestCase):
                 seg.analogsignals.append(a)
                 seg.analogsignals.append(b)
                 seg.analogsignals.append(c)
+            
                 seg.irregularlysampledsignals.append(d)
+            
                 seg.events.append(evt)
+            
                 a.segment = seg
                 b.segment = seg
                 c.segment = seg
@@ -125,6 +139,7 @@ class TestNWBIO(unittest.TestCase):
                 train2.segment = seg
                 epc.segment = seg
                 epc2.segment = seg
+                image_sequence.segment = seg
 
         # write to file
         test_file_name = "test_round_trip.nwb"
@@ -134,9 +149,10 @@ class TestNWBIO(unittest.TestCase):
         ior = NWBIO(filename=test_file_name, mode='r')
         retrieved_blocks = ior.read_all_blocks()
 
-        self.assertEqual(len(retrieved_blocks), 3)
+        print("retrieved_blocks = ", retrieved_blocks)
+        self.assertEqual(len(retrieved_blocks), 4)
         self.assertEqual(len(retrieved_blocks[2].segments), num_seg)
-
+        
         original_signal_22b = original_blocks[2].segments[2].analogsignals[1]
         retrieved_signal_22b = retrieved_blocks[2].segments[2].analogsignals[1]
         for attr_name in ("name", "units", "sampling_rate", "t_start"):
@@ -144,7 +160,7 @@ class TestNWBIO(unittest.TestCase):
             original_attribute = getattr(original_signal_22b, attr_name)
             self.assertEqual(retrieved_attribute, original_attribute)
         assert_array_equal(retrieved_signal_22b.magnitude, original_signal_22b.magnitude)
-
+        
         original_issignal_22d = original_blocks[2].segments[2].irregularlysampledsignals[0]
         retrieved_issignal_22d = retrieved_blocks[2].segments[2].irregularlysampledsignals[0]
         for attr_name in ("name", "units", "t_start"):
@@ -154,7 +170,7 @@ class TestNWBIO(unittest.TestCase):
         assert_array_equal(retrieved_issignal_22d.times.rescale('ms').magnitude,
                            original_issignal_22d.times.rescale('ms').magnitude)
         assert_array_equal(retrieved_issignal_22d.magnitude, original_issignal_22d.magnitude)
-
+        
         original_event_11 = original_blocks[1].segments[1].events[0]
         retrieved_event_11 = retrieved_blocks[1].segments[1].events[0]
         for attr_name in ("name",):
@@ -186,6 +202,11 @@ class TestNWBIO(unittest.TestCase):
                         original_epoch_11.durations.rescale('ms').magnitude)
         assert_array_equal(retrieved_epoch_11.labels, original_epoch_11.labels)
         os.remove(test_file_name)
+
+        # ImageSequence
+        original_image_11 = original_blocks[0].segments[0].imagesequences[0]
+#        retrieved_image_11 = retrieved_blocks[0].segments[0].imagesequences[0]
+        retrieved_image_11 = retrieved_blocks[0].segments[0].imagesequences
 
 
     def test_roundtrip_with_annotations(self):
@@ -226,7 +247,6 @@ class TestNWBIO(unittest.TestCase):
             "nwb_group": "stimulus",
             "nwb_neurodata_type": ("pynwb.icephys", "CurrentClampStimulusSeries"),
             "nwb_electrode": electrode_annotations,
-#            "nwb:sweep_number": 1,
             "nwb_sweep_number": sweep_number_annotations,
             "nwb:gain": 1.0,
         }
@@ -234,7 +254,6 @@ class TestNWBIO(unittest.TestCase):
             "nwb_group": "acquisition",
             "nwb_neurodata_type": ("pynwb.icephys", "CurrentClampSeries"),
             "nwb_electrode": electrode_annotations,
-#            "nwb:sweep_number": 1,
             "nwb_sweep_number": sweep_number_annotations,
             "nwb:gain": 1.0,
             "nwb:bias_current": 1e-12,
