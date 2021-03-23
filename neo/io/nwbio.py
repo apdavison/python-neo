@@ -511,7 +511,6 @@ class NWBIO(BaseIO):
             annotations["session_start_time"] = datetime.now()
 
         # todo: handle subject
-        # todo: store additional Neo annotations somewhere in NWB file
         nwbfile = NWBFile(**annotations)
 
         assert self.nwb_file_mode in ('w',)  # possibly expand to 'a'ppend later
