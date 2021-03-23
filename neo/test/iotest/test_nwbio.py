@@ -31,7 +31,7 @@ class TestNWBIO(unittest.TestCase):
     files_to_download = [
         #        Files from Allen Institute :
 #         "http://download.alleninstitute.org/informatics-archive/prerelease/H19.28.012.11.05-2.nwb",  # 64 MB
-###         "/Users/legouee/Desktop/NWB/NWB_files/Allen_Institute/H19.28.012.11.05-2.nwb",
+##         "/Users/legouee/Desktop/NWB/NWB_files/Allen_Institute/H19.28.012.11.05-2.nwb",
          "/Users/legouee/NWBwork/NeurodataWithoutBorders/nwb_tutorial/HCK09/ophys_tutorial.nwb",
     ]
 
@@ -150,7 +150,7 @@ class TestNWBIO(unittest.TestCase):
         retrieved_blocks = ior.read_all_blocks()
 
         print("retrieved_blocks = ", retrieved_blocks)
-        self.assertEqual(len(retrieved_blocks), 4)
+        self.assertEqual(len(retrieved_blocks), 3)
         self.assertEqual(len(retrieved_blocks[2].segments), num_seg)
         
         original_signal_22b = original_blocks[2].segments[2].analogsignals[1]
