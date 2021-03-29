@@ -64,6 +64,10 @@ class TestNWBIO(unittest.TestCase):
         num_seg = 4  # number of segments
         num_chan = 3  # number of channels
 
+        size_x = 3
+        size_y = 2
+        num_frame = 3
+
         for blk in original_blocks:
 
             for ind in range(num_seg):  # number of Segments
@@ -107,12 +111,18 @@ class TestNWBIO(unittest.TestCase):
                              labels=np.array(['btn3', 'btn4', 'btn5']))
 
                 # Image Sequence
-                img_sequence_array = [[[column for column in range(num_chan)]for row in range(num_seg)] for frame in range(num_chan)]
+                img_sequence_array = [[[column for column in range(size_x)]for row in range(size_y)] for frame in range(num_frame)]
                 image_sequence = ImageSequence(img_sequence_array, 
-                                           units='V',
-                                           sampling_rate=1*pq.Hz, 
-                                           spatial_scale=1*pq.micrometer
-                                           )
+                                       units='V',
+                                       sampling_rate=1*pq.Hz, 
+                                       spatial_scale=1*pq.micrometer,
+                                       imaging_plane_excitation_lambda=3., # Value for NWB
+                                       optical_channel_emission_lambda=3., # Value for NWB
+                                       optical_channel_description='', # Value for NWB
+                                       imaging_plane_description='', # Value for NWB
+                                       imaging_plane_indicator='', # Value for NWB
+                                       imaging_plane_location='', # Value for NWB
+                                      )
 
                 seg.imagesequences.append(image_sequence)
 
@@ -150,7 +160,8 @@ class TestNWBIO(unittest.TestCase):
         retrieved_blocks = ior.read_all_blocks()
 
         print("retrieved_blocks = ", retrieved_blocks)
-        self.assertEqual(len(retrieved_blocks), 3)
+#        self.assertEqual(len(retrieved_blocks), 3)
+        self.assertEqual(len(retrieved_blocks), 4)
         self.assertEqual(len(retrieved_blocks[2].segments), num_seg)
         
         original_signal_22b = original_blocks[2].segments[2].analogsignals[1]
@@ -207,6 +218,7 @@ class TestNWBIO(unittest.TestCase):
         original_image_11 = original_blocks[0].segments[0].imagesequences[0]
 #        retrieved_image_11 = retrieved_blocks[0].segments[0].imagesequences[0]
         retrieved_image_11 = retrieved_blocks[0].segments[0].imagesequences
+
 
 
     def test_roundtrip_with_annotations(self):

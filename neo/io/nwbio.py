@@ -618,43 +618,87 @@ class NWBIO(BaseIO):
         # Only TwoPhotonSeries with data as an array, not a picture file, is handle
         image_sequence_data=np.array([image.shape[0], image.shape[1], image.shape[2]])
 
+        # Metadata and/or annotations from existing NWB files
         if "nwb_neurodata_type" in image.annotations:
+
             device = nwbfile.create_device(
-                    name=annotations['imaging_plane']['device']['name'],
-                    description=annotations['imaging_plane']['device']['description'],
-                    manufacturer=annotations['imaging_plane']['device']['manufacturer'],
+                    name=image.annotations['imaging_plane']['device']['name'],
+                    description=image.annotations['imaging_plane']['device']['description'],
+                    manufacturer=image.annotations['imaging_plane']['device']['manufacturer'],
                     )
 
             optical_channel = OpticalChannel( 
-                                name=annotations['imaging_plane']['optical_channel']['name'],
-                                description=annotations['imaging_plane']['optical_channel']['description'], #image.description,
-                                emission_lambda=annotations['imaging_plane']['optical_channel']['emission_lambda']  #TO IMPROVE
+                                name=image.annotations['imaging_plane']['optical_channel']['name'],
+                                description=image.annotations['imaging_plane']['optical_channel']['description'],
+                                emission_lambda=image.annotations['imaging_plane']['optical_channel']['emission_lambda']
                             )
 
             imaging_plane = nwbfile.create_imaging_plane(
-                            name=annotations['imaging_plane']['name'],
+                            name=image.annotations['imaging_plane']['name'],
                             optical_channel=optical_channel,
-                            imaging_rate=annotations['imaging_plane']['imaging_rate'],
-                            description=annotations['imaging_plane']['description'],
+                            imaging_rate=image.annotations['imaging_plane']['imaging_rate'],
+                            description=image.annotations['imaging_plane']['description'],
                             device=device,
-                            excitation_lambda=annotations['imaging_plane']['excitation_lambda'],
-                            indicator=annotations['imaging_plane']['indicator'],
-                            location=annotations['imaging_plane']['location'],
+                            excitation_lambda=image.annotations['imaging_plane']['excitation_lambda'],
+                            indicator=image.annotations['imaging_plane']['indicator'],
+                            location=image.annotations['imaging_plane']['location'],
                         )
 
             image_series = TwoPhotonSeries(
-                name=annotations['name'],
-                data=image_sequence_data,
+                name=image.annotations['imaging_plane']['name'],
+                data=image,
                 imaging_plane=imaging_plane,
-                rate=annotations['rate'], 
-                unit=annotations['unit']         
+                rate=image.annotations['rate'], 
+                unit=image.annotations['unit']         
             )
 
             nwbfile.add_acquisition(image_series)
-        
+
+                
         else:
-            imaging_plane = None
-            pass
+            # Metadata and/or annotations from a new NWB file created with Neo
+            device_Neo = nwbfile.create_device(
+                name='name device Neo %s' %image.name,
+            )
+
+            if "optical_channel_emission_lambda" not in image.annotations:
+                raise Exception("Please enter the emission wavelength for channel, in nm with the name : optical_channel_emission_lambda")
+            if "optical_channel_description" not in image.annotations:
+                raise Exception("Please enter any notes or comments about the channel with the name : optical_channel_description")
+            else:
+                optical_channel_Neo = OpticalChannel( 
+                        name='name optical_channel_Neo %s' %image.name,
+                        description=image.annotations["optical_channel_description"],
+                        emission_lambda=image.annotations["optical_channel_emission_lambda"],
+                )
+
+            if "imaging_plane_description" not in image.annotations:
+                raise Exception("Please enter the description of the imaging plane with the name : imaging_plane_description")
+            if "imaging_plane_indicator" not in image.annotations:
+                raise Exception("Please enter the calcium indicator with the name : imaging_plane_indicator")
+            if "imaging_plane_location" not in image.annotations:
+                raise Exception("Please enter the location of the image plane with the name : imaging_plane_location")
+            if "imaging_plane_excitation_lambda" not in image.annotations:
+                raise Exception("Please enter the excitation wavelength in nm with the name : imaging_plane_excitation_lambda")
+            else:
+                imaging_plane_Neo = nwbfile.create_imaging_plane(
+                    name='name imaging_plane Neo %s' %image.name,
+                    optical_channel=optical_channel_Neo,
+                    description=image.annotations["imaging_plane_description"],
+                    device=device_Neo,
+                    excitation_lambda=image.annotations["imaging_plane_excitation_lambda"],
+                    indicator=image.annotations["imaging_plane_indicator"],
+                    location=image.annotations["imaging_plane_location"],
+                )
+            
+            image_series_Neo = TwoPhotonSeries(
+                name='name images_series_Neo %s' %image.name,
+                data=image,
+                imaging_plane=imaging_plane_Neo,
+                rate=float(image.sampling_rate), #ImageSequence
+            )
+
+            nwbfile.add_acquisition(image_series_Neo)
 
 
     def _write_signal(self, nwbfile, signal, electrodes):
