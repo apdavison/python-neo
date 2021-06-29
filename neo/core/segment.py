@@ -81,7 +81,7 @@ class Segment(Container):
                            ('rec_datetime', datetime),
                            ('index', int)) +
                           Container._recommended_attrs)
-    _repr_pretty_containers = ('analogsignals',)
+    _repr_pretty_containers = ('analogsignals', 'imagesequences')
 
     def __init__(self, name=None, description=None, file_origin=None,
                  file_datetime=None, rec_datetime=None, index=None,

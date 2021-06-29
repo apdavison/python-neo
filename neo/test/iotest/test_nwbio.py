@@ -25,6 +25,9 @@ except (ImportError, SyntaxError):
 import quantities as pq
 import numpy as np
 from numpy.testing import assert_array_equal, assert_allclose
+from neo.test.rawiotest.tools import create_local_temp_dir
+import subprocess
+from subprocess import run
 
 
 @unittest.skipUnless(HAVE_PYNWB, "requires pynwb")
@@ -32,23 +35,31 @@ class TestNWBIO(unittest.TestCase):
     ioclass = NWBIO
     files_to_download = [
         #        Files from Allen Institute :
-        # "http://download.alleninstitute.org/informatics-archive/prerelease/H19.28.012.11.05-2.nwb",  # 64 MB
-        "http://download.alleninstitute.org/informatics-archive/prerelease/H19.29.141.11.21.01.nwb",  # 7 MB
+#         "http://download.alleninstitute.org/informatics-archive/prerelease/H19.28.012.11.05-2.nwb",  # 64 MB
+##         "/Users/legouee/Desktop/NWB/NWB_files/Allen_Institute/H19.28.012.11.05-2.nwb",
+        #### "/Users/legouee/NWBwork/NeurodataWithoutBorders/nwb_tutorial/HCK09/ophys_tutorial.nwb",
+        ## "/Users/legouee/Desktop/Example_NWB_Fluorescence_File.nwb",
+        "/Users/legouee/Desktop/ophys_tutorial.nwb",
     ]
 
     def test_read(self):
         self.local_test_dir = get_local_testing_data_folder() / "nwb"
         os.makedirs(self.local_test_dir, exist_ok=True)
-        for url in self.files_to_download:
-            local_filename = os.path.join(self.local_test_dir, url.split("/")[-1])
-            if not os.path.exists(local_filename):
-                try:
-                    urlretrieve(url, local_filename)
-                except IOError as exc:
-                    raise unittest.TestCase.failureException(exc)
-            io = NWBIO(local_filename, 'r')
-            blocks = io.read()
 
+#        for url in self.files_to_download:
+#            local_filename = os.path.join(self.local_test_dir, url.split("/")[-1])
+#            if not os.path.exists(local_filename):
+#                try:
+#                    urlretrieve(url, self.local_filename[0])
+##                    urlretrieve(url, local_filename) #
+#                except IOError as exc:
+#                    raise unittest.TestCase.failureException(exc)
+#            io = NWBIO(local_filename, 'r')
+#            blocks = io.read()
+
+        io = NWBIO(self.files_to_download[0], 'r')
+        blocks = io.read()
+    
     def test_roundtrip(self):
 
         annotations = {
@@ -62,6 +73,10 @@ class TestNWBIO(unittest.TestCase):
 
         num_seg = 4  # number of segments
         num_chan = 3  # number of channels
+
+        size_x = 3
+        size_y = 2
+        num_frame = 3
 
         for blk in original_blocks:
 
@@ -105,6 +120,22 @@ class TestNWBIO(unittest.TestCase):
                              durations=[9, 3, 8] * pq.ms,
                              labels=np.array(['btn3', 'btn4', 'btn5']))
 
+                # Image Sequence
+                img_sequence_array = [[[column for column in range(size_x)]for row in range(size_y)] for frame in range(num_frame)]
+                image_sequence = ImageSequence(img_sequence_array, 
+                                       units='V',
+                                       sampling_rate=1*pq.Hz, 
+                                       spatial_scale=1*pq.micrometer,
+                                       imaging_plane_excitation_lambda=3., # Value for NWB
+                                       optical_channel_emission_lambda=3., # Value for NWB
+                                       optical_channel_description='', # Value for NWB
+                                       imaging_plane_description='', # Value for NWB
+                                       imaging_plane_indicator='', # Value for NWB
+                                       imaging_plane_location='', # Value for NWB
+                                      )
+
+                seg.imagesequences.append(image_sequence)
+
                 seg.spiketrains.append(train)
                 seg.spiketrains.append(train2)
 
@@ -114,8 +145,11 @@ class TestNWBIO(unittest.TestCase):
                 seg.analogsignals.append(a)
                 seg.analogsignals.append(b)
                 seg.analogsignals.append(c)
+            
                 seg.irregularlysampledsignals.append(d)
+            
                 seg.events.append(evt)
+            
                 a.segment = seg
                 b.segment = seg
                 c.segment = seg
@@ -125,6 +159,7 @@ class TestNWBIO(unittest.TestCase):
                 train2.segment = seg
                 epc.segment = seg
                 epc2.segment = seg
+                image_sequence.segment = seg
 
         # write to file
         test_file_name = "test_round_trip.nwb"
@@ -134,9 +169,11 @@ class TestNWBIO(unittest.TestCase):
         ior = NWBIO(filename=test_file_name, mode='r')
         retrieved_blocks = ior.read_all_blocks()
 
-        self.assertEqual(len(retrieved_blocks), 3)
+        print("retrieved_blocks = ", retrieved_blocks)
+#        self.assertEqual(len(retrieved_blocks), 3)
+        self.assertEqual(len(retrieved_blocks), 4)
         self.assertEqual(len(retrieved_blocks[2].segments), num_seg)
-
+        
         original_signal_22b = original_blocks[2].segments[2].analogsignals[1]
         retrieved_signal_22b = retrieved_blocks[2].segments[2].analogsignals[1]
         for attr_name in ("name", "units", "sampling_rate", "t_start"):
@@ -144,7 +181,7 @@ class TestNWBIO(unittest.TestCase):
             original_attribute = getattr(original_signal_22b, attr_name)
             self.assertEqual(retrieved_attribute, original_attribute)
         assert_array_equal(retrieved_signal_22b.magnitude, original_signal_22b.magnitude)
-
+        
         original_issignal_22d = original_blocks[2].segments[2].irregularlysampledsignals[0]
         retrieved_issignal_22d = retrieved_blocks[2].segments[2].irregularlysampledsignals[0]
         for attr_name in ("name", "units", "t_start"):
@@ -154,7 +191,7 @@ class TestNWBIO(unittest.TestCase):
         assert_array_equal(retrieved_issignal_22d.times.rescale('ms').magnitude,
                            original_issignal_22d.times.rescale('ms').magnitude)
         assert_array_equal(retrieved_issignal_22d.magnitude, original_issignal_22d.magnitude)
-
+        
         original_event_11 = original_blocks[1].segments[1].events[0]
         retrieved_event_11 = retrieved_blocks[1].segments[1].events[0]
         for attr_name in ("name",):
@@ -185,6 +222,14 @@ class TestNWBIO(unittest.TestCase):
         assert_allclose(retrieved_epoch_11.durations.rescale('ms').magnitude,
                         original_epoch_11.durations.rescale('ms').magnitude)
         assert_array_equal(retrieved_epoch_11.labels, original_epoch_11.labels)
+
+        # ImageSequence
+        original_image_11 = original_blocks[0].segments[0].imagesequences[0]
+#        retrieved_image_11 = retrieved_blocks[0].segments[0].imagesequences[0]
+        retrieved_image_11 = retrieved_blocks[0].segments[0].imagesequences
+
+        run(["python", "-m", "pynwb.validate", test_file_name])
+        
         os.remove(test_file_name)
 
     def test_roundtrip_with_annotations(self):
@@ -200,30 +245,50 @@ class TestNWBIO(unittest.TestCase):
             "description": "intracellular electrode",
             "device": {
                 "name": "electrode #1"
-            }
+            },
+        }
+
+        sweep_number_annotations = {
+            "name": ("pynwb.icephys", "SweepTable"),
+            "description": "Description of the SweepTable",
+            "id": 1.0,
+            "columns":1,
+#            "columns": {
+#                "series_index":1,
+#                "series":1,
+#                "sweep_number":1.0,
+#            },
+            "colnames":1,
+#            "colnames": "sweep_number",
+#            "colnames": {
+#                "series",
+#                "sweep_number",
+#            },
+        #    "series_index":"series"
         }
         stimulus_annotations = {
             "nwb_group": "stimulus",
             "nwb_neurodata_type": ("pynwb.icephys", "CurrentClampStimulusSeries"),
             "nwb_electrode": electrode_annotations,
-            "nwb:sweep_number": 1,
-            "nwb:gain": 1.0
+            "nwb_sweep_number": sweep_number_annotations,
+            "nwb:gain": 1.0,
         }
         response_annotations = {
             "nwb_group": "acquisition",
             "nwb_neurodata_type": ("pynwb.icephys", "CurrentClampSeries"),
             "nwb_electrode": electrode_annotations,
-            "nwb:sweep_number": 1,
+            "nwb_sweep_number": sweep_number_annotations,
             "nwb:gain": 1.0,
             "nwb:bias_current": 1e-12,
             "nwb:bridge_balance": 70e6,
-            "nwb:capacitance_compensation": 1e-12
+            "nwb:capacitance_compensation": 1e-12,
         }
         stimulus = AnalogSignal(np.random.randn(100, 1) * pq.nA,
                                 sampling_rate=5 * pq.kHz,
                                 t_start=50 * pq.ms,
                                 name="stimulus",
-                                **stimulus_annotations)
+                                **stimulus_annotations
+                                )
         response = AnalogSignal(np.random.randn(100, 1) * pq.mV,
                                 sampling_rate=5 * pq.kHz,
                                 t_start=50 * pq.ms,
@@ -232,17 +297,17 @@ class TestNWBIO(unittest.TestCase):
         segment.analogsignals = [stimulus, response]
         stimulus.segment = response.segment = segment
 
-        test_file_name = "test_round_trip_with_annotations.nwb"
-        iow = NWBIO(filename=test_file_name, mode='w')
+        test_file_name_annotations = "test_round_trip_with_annotations.nwb"
+        iow = NWBIO(filename=test_file_name_annotations, mode='w')
         iow.write_all_blocks([original_block])
 
-        nwbfile = pynwb.NWBHDF5IO(test_file_name, mode="r").read()
+        nwbfile = pynwb.NWBHDF5IO(test_file_name_annotations, mode="r").read()
 
         self.assertIsInstance(nwbfile.acquisition["response"], pynwb.icephys.CurrentClampSeries)
         self.assertIsInstance(nwbfile.stimulus["stimulus"], pynwb.icephys.CurrentClampStimulusSeries)
         self.assertEqual(nwbfile.acquisition["response"].bridge_balance, response_annotations["nwb:bridge_balance"])
 
-        ior = NWBIO(filename=test_file_name, mode='r')
+        ior = NWBIO(filename=test_file_name_annotations, mode='r')
         retrieved_block = ior.read_all_blocks()[0]
 
         original_response = original_block.segments[0].filter(name="response")[0]
@@ -253,7 +318,13 @@ class TestNWBIO(unittest.TestCase):
             self.assertEqual(retrieved_attribute, original_attribute)
         assert_array_equal(retrieved_response.magnitude, original_response.magnitude)
 
-        os.remove(test_file_name)
+        #run(["python", "-m", "pynwb.validate",
+        #                       "--list-namespaces", "--cached-namespace", test_file_name],
+        #                       universal_newlines=True, timeout=20)
+        run(["python", "-m", "pynwb.validate", test_file_name_annotations])
+
+
+        os.remove(test_file_name_annotations)
 
 
 if __name__ == "__main__":
