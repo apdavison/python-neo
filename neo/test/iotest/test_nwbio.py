@@ -23,6 +23,8 @@ import quantities as pq
 import numpy as np
 from numpy.testing import assert_array_equal, assert_allclose
 from neo.test.rawiotest.tools import create_local_temp_dir
+import subprocess
+from subprocess import run
 
 
 @unittest.skipUnless(HAVE_PYNWB, "requires pynwb")
@@ -32,7 +34,9 @@ class TestNWBIO(unittest.TestCase):
         #        Files from Allen Institute :
 #         "http://download.alleninstitute.org/informatics-archive/prerelease/H19.28.012.11.05-2.nwb",  # 64 MB
 ##         "/Users/legouee/Desktop/NWB/NWB_files/Allen_Institute/H19.28.012.11.05-2.nwb",
-         "/Users/legouee/NWBwork/NeurodataWithoutBorders/nwb_tutorial/HCK09/ophys_tutorial.nwb",
+        #### "/Users/legouee/NWBwork/NeurodataWithoutBorders/nwb_tutorial/HCK09/ophys_tutorial.nwb",
+        ## "/Users/legouee/Desktop/Example_NWB_Fluorescence_File.nwb",
+        "/Users/legouee/Desktop/ophys_tutorial.nwb",
     ]
 
     def test_read(self):
@@ -212,14 +216,15 @@ class TestNWBIO(unittest.TestCase):
         assert_allclose(retrieved_epoch_11.durations.rescale('ms').magnitude,
                         original_epoch_11.durations.rescale('ms').magnitude)
         assert_array_equal(retrieved_epoch_11.labels, original_epoch_11.labels)
-        os.remove(test_file_name)
 
         # ImageSequence
         original_image_11 = original_blocks[0].segments[0].imagesequences[0]
 #        retrieved_image_11 = retrieved_blocks[0].segments[0].imagesequences[0]
         retrieved_image_11 = retrieved_blocks[0].segments[0].imagesequences
 
-
+        run(["python", "-m", "pynwb.validate", test_file_name])
+        
+        os.remove(test_file_name)
 
     def test_roundtrip_with_annotations(self):
         # test with NWB-specific annotations
@@ -286,17 +291,17 @@ class TestNWBIO(unittest.TestCase):
         segment.analogsignals = [stimulus, response]
         stimulus.segment = response.segment = segment
 
-        test_file_name = "test_round_trip_with_annotations.nwb"
-        iow = NWBIO(filename=test_file_name, mode='w')
+        test_file_name_annotations = "test_round_trip_with_annotations.nwb"
+        iow = NWBIO(filename=test_file_name_annotations, mode='w')
         iow.write_all_blocks([original_block])
 
-        nwbfile = pynwb.NWBHDF5IO(test_file_name, mode="r").read()
+        nwbfile = pynwb.NWBHDF5IO(test_file_name_annotations, mode="r").read()
 
         self.assertIsInstance(nwbfile.acquisition["response"], pynwb.icephys.CurrentClampSeries)
         self.assertIsInstance(nwbfile.stimulus["stimulus"], pynwb.icephys.CurrentClampStimulusSeries)
         self.assertEqual(nwbfile.acquisition["response"].bridge_balance, response_annotations["nwb:bridge_balance"])
 
-        ior = NWBIO(filename=test_file_name, mode='r')
+        ior = NWBIO(filename=test_file_name_annotations, mode='r')
         retrieved_block = ior.read_all_blocks()[0]
 
         original_response = original_block.segments[0].filter(name="response")[0]
@@ -307,7 +312,13 @@ class TestNWBIO(unittest.TestCase):
             self.assertEqual(retrieved_attribute, original_attribute)
         assert_array_equal(retrieved_response.magnitude, original_response.magnitude)
 
-        os.remove(test_file_name)
+        #run(["python", "-m", "pynwb.validate",
+        #                       "--list-namespaces", "--cached-namespace", test_file_name],
+        #                       universal_newlines=True, timeout=20)
+        run(["python", "-m", "pynwb.validate", test_file_name_annotations])
+
+
+        os.remove(test_file_name_annotations)
 
 
 if __name__ == "__main__":
