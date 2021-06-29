@@ -212,13 +212,10 @@ class AnalogSignalProxy(BaseProxy):
 
         sr = self.sampling_rate
 
-        Also returns t_start
-        """
         if time_slice is None:
             i_start, i_stop = None, None
             sig_t_start = self.t_start
         else:
-            sr = self.sampling_rate
             t_start, t_stop = time_slice
             if t_start is None:
                 i_start = None
@@ -244,34 +241,6 @@ class AnalogSignalProxy(BaseProxy):
                 else:
                     t_stop = min(t_stop, self.t_stop)
                 i_stop = int((t_stop - self.t_start).magnitude * sr.magnitude)
-        return i_start, i_stop, sig_t_start
-
-    def load(self, time_slice=None, strict_slicing=True,
-                    channel_indexes=None, magnitude_mode='rescaled'):
-        '''
-        *Args*:
-            :time_slice: None or tuple of the time slice expressed with quantities.
-                            None is the entire signal.
-            :channel_indexes: None or list. Channels to load. None is all channels
-                    Be carefull that channel_indexes represent the local channel index inside
-                    the AnalogSignal and not the global_channel_indexes like in rawio.
-            :magnitude_mode: 'rescaled' or 'raw'.
-                For instance if the internal dtype is int16:
-                    * **rescaled** give [1.,2.,3.]*pq.uV and the dtype is float32
-                    * **raw** give [10, 20, 30]*pq.CompoundUnit('0.1*uV')
-                The CompoundUnit with magnitude_mode='raw' is usefull to
-                postpone the scaling when needed and having an internal dtype=int16
-                but it less intuitive when you don't know so well quantities.
-            :strict_slicing: True by default.
-                Control if an error is raise or not when one of  time_slice member
-                (t_start or t_stop) is outside the real time range of the segment.
-        '''
-
-        if channel_indexes is None:
-            channel_indexes = slice(None)
-
-        i_start, i_stop, sig_t_start = self._time_slice_indices(time_slice,
-                                                                strict_slicing=strict_slicing)
 
         raw_signal = self._rawio.get_analogsignal_chunk(block_index=self._block_index,
                     seg_index=self._seg_index, i_start=i_start, i_stop=i_stop,

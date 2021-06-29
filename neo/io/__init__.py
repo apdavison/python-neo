@@ -282,7 +282,7 @@ from neo.io.neuroexplorerio import NeuroExplorerIO
 from neo.io.neuroscopeio import NeuroScopeIO
 from neo.io.nixio import NixIO
 from neo.io.nixio_fr import NixIO as NixIOFr
-from neo.io.nsdfio import NSDFIO
+#from neo.io.nsdfio import NSDFIO
 from neo.io.nwbio import NWBIO
 from neo.io.openephysio import OpenEphysIO
 from neo.io.openephysbinaryio import OpenEphysBinaryIO
@@ -330,7 +330,7 @@ iolist = [
     NeuroExplorerIO,
     NeuroScopeIO,
     NeuroshareIO,
-    NSDFIO,
+#    NSDFIO,
     NWBIO,
     OpenEphysIO,
     OpenEphysBinaryIO,
