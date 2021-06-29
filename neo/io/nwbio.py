@@ -43,8 +43,8 @@ from neo.io.proxyobjects import (
     EpochProxy as BaseEpochProxy,
     SpikeTrainProxy as BaseSpikeTrainProxy
 )
-from neo.core import (Segment, SpikeTrain, Unit, Epoch, Event, AnalogSignal,
-                      IrregularlySampledSignal, ChannelIndex, Block, ImageSequence,
+from neo.core import (Segment, SpikeTrain, Epoch, Event, AnalogSignal, #Unit, ChannelIndex
+                      IrregularlySampledSignal, Block, ImageSequence,
                       RectangularRegionOfInterest, CircularRegionOfInterest, PolygonRegionOfInterest)
 
 # PyNWB imports
@@ -816,10 +816,6 @@ class NWBIO(BaseIO):
 
     def _write_signal(self, nwbfile, signal, electrodes):
         hierarchy = {'block': signal.segment.block.name, 'segment': signal.segment.name}
-<<<<<<< HEAD
-
-=======
->>>>>>> 084967d3674fcae08bca02245a23c8ed5e686895
         if "nwb_neurodata_type" in signal.annotations:
             timeseries_class = get_class(*signal.annotations["nwb_neurodata_type"])
         else:
