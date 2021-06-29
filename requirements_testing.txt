@@ -12,4 +12,5 @@ ipython
 coverage
 coveralls
 pillow
+sonpy
 pynwb

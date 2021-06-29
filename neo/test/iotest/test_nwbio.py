@@ -6,12 +6,15 @@ Tests of neo.io.nwbio
 from __future__ import unicode_literals, print_function, division, absolute_import
 import unittest
 import os
+from datetime import datetime
+
 try:
     from urllib.request import urlretrieve
 except ImportError:
     from urllib import urlretrieve
 from neo.test.iotest.common_io_test import BaseTestIO
-from neo.core import AnalogSignal, SpikeTrain, Event, Epoch, IrregularlySampledSignal, Segment, Unit, Block, ChannelIndex, ImageSequence
+from neo.core import AnalogSignal, SpikeTrain, Event, Epoch, IrregularlySampledSignal, Segment, Block, ImageSequence
+from neo.utils import get_local_testing_data_folder
 try:
     import pynwb
     from neo.io.nwbio import NWBIO
@@ -40,7 +43,7 @@ class TestNWBIO(unittest.TestCase):
     ]
 
     def test_read(self):
-        self.local_test_dir = create_local_temp_dir("nwb")
+        self.local_test_dir = get_local_testing_data_folder() / "nwb"
         os.makedirs(self.local_test_dir, exist_ok=True)
 
 #        for url in self.files_to_download:
@@ -59,10 +62,13 @@ class TestNWBIO(unittest.TestCase):
     
     def test_roundtrip(self):
 
+        annotations = {
+            "session_start_time": datetime.now()
+        }
         # Define Neo blocks
-        bl0 = Block(name='First block')
-        bl1 = Block(name='Second block')
-        bl2 = Block(name='Third block')
+        bl0 = Block(name='First block', **annotations)
+        bl1 = Block(name='Second block', **annotations)
+        bl2 = Block(name='Third block', **annotations)
         original_blocks = [bl0, bl1, bl2]
 
         num_seg = 4  # number of segments
@@ -229,7 +235,7 @@ class TestNWBIO(unittest.TestCase):
     def test_roundtrip_with_annotations(self):
         # test with NWB-specific annotations
 
-        original_block = Block(name="experiment")
+        original_block = Block(name="experiment", session_start_time=datetime.now())
         segment = Segment(name="session 1")
         original_block.segments.append(segment)
         segment.block = original_block

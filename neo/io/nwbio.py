@@ -1,6 +1,6 @@
 """
 NWBIO
-========
+=====
 
 IO class for reading data from a Neurodata Without Borders (NWB) dataset
 
@@ -12,6 +12,7 @@ Python APIs - (1) https://github.com/NeurodataWithoutBorders/pynwb
               (2) https://github.com/AllenInstitute/nwb-api/tree/master/ainwb
 	          (3) https://github.com/AllenInstitute/AllenSDK/blob/master/allensdk/core/nwb_data_set.py
               (4) https://github.com/NeurodataWithoutBorders/api-python
+Python API -  https://pynwb.readthedocs.io
 Sample datasets from CRCNS - https://crcns.org/NWB
 Sample datasets from Allen Institute - http://alleninstitute.github.io/AllenSDK/cell_types.html#neurodata-without-borders
 """
@@ -19,6 +20,7 @@ Sample datasets from Allen Institute - http://alleninstitute.github.io/AllenSDK/
 from __future__ import absolute_import, division
 from neo.core import baseneo
 
+import logging
 import os
 from itertools import chain
 from datetime import datetime
@@ -79,6 +81,9 @@ except SyntaxError:
     have_hdmf = False
 
 
+logger = logging.getLogger("Neo")
+
+
 GLOBAL_ANNOTATIONS = (
     "session_start_time", "identifier", "timestamps_reference_time", "experimenter",
     "experiment_description", "session_id", "institution", "keywords", "notes",
@@ -101,6 +106,7 @@ prefix_map = {
     1e-9: 'nano',
     1e-12: 'pico'
 }
+
 
 def try_json_field(content):
     """
@@ -211,7 +217,11 @@ def _recompose_unit(base_unit_name, conversion):
     unit_name = prefix_map[conversion] + base_unit_name
     if unit_name[-1] == "s":  # strip trailing 's', e.g. "volts" --> "volt"
         unit_name = unit_name[:-1]
-    return getattr(pq, unit_name)
+    try:
+        return getattr(pq, unit_name)
+    except AttributeError:
+        logger.warning(f"Can't handle unit '{unit_name}'. Returning dimensionless")
+        return pq.dimensionless
 
 
 class NWBIO(BaseIO):
@@ -286,11 +296,11 @@ class NWBIO(BaseIO):
 
         return list(self._blocks.values())
 
-    def read_block(self, lazy=False, **kargs):
+    def read_block(self, lazy=False, block_index=0, **kargs):
         """
         Load the first block in the file.
         """
-        return self.read_all_blocks(lazy=lazy)[0]
+        return self.read_all_blocks(lazy=lazy)[block_index]
 
     def _get_segment(self, block_name, segment_name):
         # If we've already created a Block with the given name return it,
@@ -327,7 +337,7 @@ class NWBIO(BaseIO):
             if epoch_names is not None:
                 unique_epoch_names = np.unique(epoch_names)
                 for epoch_name in unique_epoch_names:
-                    index = (epoch_names == epoch_name)
+                    index, = np.where((epoch_names == epoch_name))
                     epoch = EpochProxy(self._file.epochs, epoch_name, index)
                     if not lazy:
                         epoch = epoch.load()
@@ -544,7 +554,6 @@ class NWBIO(BaseIO):
         Write list of blocks to the file
         """
         # todo: allow metadata in NWBFile constructor to be taken from kwargs
-        start_time = datetime.now()
         annotations = defaultdict(set)
         for annotation_name in GLOBAL_ANNOTATIONS:
             if annotation_name in kwargs:
@@ -573,6 +582,7 @@ class NWBIO(BaseIO):
             # todo: concatenate descriptions of multiple blocks if different
         if "session_start_time" not in annotations:
             annotations["session_start_time"] = datetime.now()
+#            raise Exception("Writing to NWB requires an annotation 'session_start_time'")
 
         # todo: handle subject
         nwbfile = NWBFile(**annotations)
@@ -600,8 +610,11 @@ class NWBIO(BaseIO):
         io_nwb.write(nwbfile)
         io_nwb.close()
 
-#        run(["python", "-m", "pynwb.validate", "--list-namespaces", "--cached-namespace", self.filename])
-        run(["python", "-m", "pynwb.validate", self.filename])
+        io_validate = pynwb.NWBHDF5IO(self.filename, "r")
+        errors = pynwb.validate(io_validate, namespace="core")
+        if errors:
+            raise Exception(f"Errors found when validating {self.filename}")
+        io_validate.close()
 
     def write_block(self, nwbfile, block, **kwargs):
         """
@@ -803,7 +816,10 @@ class NWBIO(BaseIO):
 
     def _write_signal(self, nwbfile, signal, electrodes):
         hierarchy = {'block': signal.segment.block.name, 'segment': signal.segment.name}
+<<<<<<< HEAD
 
+=======
+>>>>>>> 084967d3674fcae08bca02245a23c8ed5e686895
         if "nwb_neurodata_type" in signal.annotations:
             timeseries_class = get_class(*signal.annotations["nwb_neurodata_type"])
         else:
@@ -927,9 +943,9 @@ class AnalogSignalProxy(BaseAnalogSignalProxy):
         if timeseries.conversion:
             self.units = _recompose_unit(timeseries.unit, timeseries.conversion)
         if timeseries.starting_time is not None:
-            self.t_start = timeseries.starting_time * pq.s  # todo: use timeseries.starting_time_unit
+            self.t_start = timeseries.starting_time * pq.s
         else:
-            self.t_start = timeseries.timestamps[0] * pq.s  # todo: use timeseries.timestamps.unit
+            self.t_start = timeseries.timestamps[0] * pq.s
         if timeseries.rate:
             self.sampling_rate = timeseries.rate * pq.Hz
         else:
@@ -943,6 +959,8 @@ class AnalogSignalProxy(BaseAnalogSignalProxy):
                 self.annotations.pop("name")
             self.description = None
         self.shape = self._timeseries.data.shape
+        if len(self.shape) == 1:
+            self.shape = (self.shape[0], 1)
         metadata_fields = list(timeseries.__nwbfields__)
         for field_name in self.__class__.common_metadata_fields:  # already handled
             try:
@@ -984,6 +1002,7 @@ class AnalogSignalProxy(BaseAnalogSignalProxy):
                 Control if an error is raised or not when one of the time_slice members
                 (t_start or t_stop) is outside the real time range of the segment.
         """
+        i_start, i_stop, sig_t_start = None, None, self.t_start
         if time_slice:
             i_start, i_stop, sig_t_start = self._time_slice_indices(time_slice,
                                                                     strict_slicing=strict_slicing)
@@ -999,7 +1018,7 @@ class AnalogSignalProxy(BaseAnalogSignalProxy):
 
         if self.sampling_rate is None:
             return IrregularlySampledSignal(
-                        self._timeseries.timestamps[:] * pq.s,
+                        self._timeseries.timestamps[i_start:i_stop] * pq.s,
                         signal,
                         units=self.units,
                         t_start=sig_t_start,
@@ -1129,7 +1148,6 @@ class SpikeTrainProxy(BaseSpikeTrainProxy):
                     waveforms=None, #
                     left_sweep=None, #
                     name=self.name,
-                    file_origin=None, #
                     description=None, #
                     array_annotations=None, #
                     id=self.id, ###
@@ -1152,4 +1170,3 @@ class ImageSequenceProxy(BaseAnalogSignalProxy):
                             sampling_rate=timeseries.rate*pq.Hz, 
                             spatial_scale=timeseries.spatial_scale*pq.micrometer,
                             )
-    
