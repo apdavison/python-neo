@@ -399,6 +399,8 @@ class NWBIO(BaseIO):
     def _read_fluorescence_group(self, group_name, lazy): # Processing for PyNWB
         group_fluo = getattr(self._file, group_name)
 
+        print("self._file = ", self._file)
+#        print("self._file.processing = ", self._file.processing)
         RoiResponseSeries = self._file.processing['ophys']['Fluorescence']['RoiResponseSeries']
 
         if RoiResponseSeries.data:
@@ -665,6 +667,7 @@ class NWBIO(BaseIO):
             if not signal.name:
                 signal.name = "%s : analogsignal%d %i" % (segment.name, i, i)
             self._write_signal(nwbfile, signal, electrodes)
+            self._write_fluorescence(nwbfile, signal)
 
         for i, image in enumerate(segment.imagesequences):
             #assert image.segment is segment
@@ -672,7 +675,8 @@ class NWBIO(BaseIO):
             if not image.name:
                 image.name = "%s : image%d" % (segment.name, i)
             self._write_image(nwbfile, image)
-            self._write_fluorescence(nwbfile, image)
+#            self._write_fluorescence(nwbfile, image)
+
 
         for i, train in enumerate(segment.spiketrains):
             assert train.segment is segment
@@ -782,8 +786,47 @@ class NWBIO(BaseIO):
             nwbfile.add_acquisition(image_series_Neo)
 
 
+            ###
+            img_seg = ImageSegmentation()
+
+            ps = img_seg.create_plane_segmentation(
+                    name='name plane_segmentation Neo %s' %image.name, #PlaneSegmentation',
+                    description=image.description, #'output from segmenting my favorite imaging plane',
+                    imaging_plane=imaging_plane,
+                    #reference_images=image_series  # optional
+            )
+            ophys_module = nwbfile.create_processing_module(
+                    name='ophys', 
+                    description='optical physiology processed data'
+            )
+            print("ophys_module = ", ophys_module)
+            ophys_module.add(img_seg)
+
+            # Storing fluorescence measurements
+            rt_region = ps.create_roi_table_region(
+                    #region=[0,1], # optional ???
+                    description='the first of two ROIs'
+            )
+            roi_resp_series = RoiResponseSeries(
+                    name='RoiResponseSeries',
+                    data=np.ones((50,2)),  # 50 samples, 2 rois
+                    rois=rt_region,
+                    unit='lumens',
+                    rate=30.
+            )
+            fl = Fluorescence(roi_response_series=roi_resp_series)
+            print("fl = ", fl)
+            ophys_module.add(fl)
+            ###
+
+            nwbfile.add(fl) ###
+
+
+
     def _write_fluorescence(self, nwbfile, image):
+        print("*** _write_fluorescence ***")
         # Plane Segmentation
+        """
         img_seg = ImageSegmentation()
 
         ps = img_seg.create_plane_segmentation(
@@ -811,7 +854,10 @@ class NWBIO(BaseIO):
                 rate=30.
         )
         fl = Fluorescence(roi_response_series=roi_resp_series)
-        ophys_module.add(fl)
+#        ophys_module.add(fl)
+##        ophys_module.add_processing_module(fl)
+        ophys_module.add_processing(fl)
+        """
 
 
     def _write_signal(self, nwbfile, signal, electrodes):
