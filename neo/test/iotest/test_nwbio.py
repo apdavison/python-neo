@@ -25,7 +25,6 @@ except (ImportError, SyntaxError):
 import quantities as pq
 import numpy as np
 from numpy.testing import assert_array_equal, assert_allclose
-from neo.test.rawiotest.tools import create_local_temp_dir
 import subprocess
 from subprocess import run
 
@@ -170,8 +169,8 @@ class TestNWBIO(unittest.TestCase):
         retrieved_blocks = ior.read_all_blocks()
 
         print("retrieved_blocks = ", retrieved_blocks)
-#        self.assertEqual(len(retrieved_blocks), 3)
-        self.assertEqual(len(retrieved_blocks), 4)
+        self.assertEqual(len(retrieved_blocks), 3)
+#        self.assertEqual(len(retrieved_blocks), 4)
         self.assertEqual(len(retrieved_blocks[2].segments), num_seg)
         
         original_signal_22b = original_blocks[2].segments[2].analogsignals[1]

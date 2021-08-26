@@ -399,51 +399,54 @@ class NWBIO(BaseIO):
     def _read_fluorescence_group(self, group_name, lazy): # Processing for PyNWB
         group_fluo = getattr(self._file, group_name)
 
-        print("self._file = ", self._file)
-#        print("self._file.processing = ", self._file.processing)
-        RoiResponseSeries = self._file.processing['ophys']['Fluorescence']['RoiResponseSeries']
+        if self._file.processing=={}:
+            print("--- No processing module")
+        else:
+            if 'ophys' not in self._file.processing:
+                pass
+            else:
+                RoiResponseSeries = self._file.processing['ophys']['Fluorescence']['RoiResponseSeries']
 
-        if RoiResponseSeries.data:
-            #units = self._file.processing['ophys']['Fluorescence']['RoiResponseSeries'].unit #lumens
-            units = self._file.processing['ophys']['ImageSegmentation']['PlaneSegmentation'].imaging_plane.unit
-            spatial_scale = self._file.processing['ophys']['ImageSegmentation']['PlaneSegmentation'].imaging_plane.grid_spacing_unit
-            sampling_rate = RoiResponseSeries.rate
-            if sampling_rate is None:
-                sampling_rate=1
-            
-#            seg = Segment(name='segment')
+                if RoiResponseSeries.data:
+                    units = self._file.processing['ophys']['ImageSegmentation']['PlaneSegmentation'].imaging_plane.unit
+                    spatial_scale = self._file.processing['ophys']['ImageSegmentation']['PlaneSegmentation'].imaging_plane.grid_spacing_unit
+                    sampling_rate = RoiResponseSeries.rate
+                    if sampling_rate is None:
+                        sampling_rate=1
+                    
+        #            seg = Segment(name='segment')
 
-            # processing_module for pynwb
-            attr_ImageSegmentation={"name", "image_mask", "pixel_mask", "description", "id", "imaging_plane", "reference_images"} # ImageSegmentation
-            attr_roi_rrs={"name", "comments", "conversion", "data", "description", "interval", "resolution", "rois", "timestamps", "timestmaps_unit", "unit"} # roi_response_series
-            attr_Fluorescence={"name", "roi_response_series", "Imagesegmentation"}
+                    # processing_module for pynwb
+                    attr_ImageSegmentation={"name", "image_mask", "pixel_mask", "description", "id", "imaging_plane", "reference_images"} # ImageSegmentation
+                    attr_roi_rrs={"name", "comments", "conversion", "data", "description", "interval", "resolution", "rois", "timestamps", "timestmaps_unit", "unit"} # roi_response_series
+                    attr_Fluorescence={"name", "roi_response_series", "Imagesegmentation"}
 
-            self.global_dict_image_metadata = {}
-            self.global_dict_image_metadata["nwb_neurodata_type"] = (
-                RoiResponseSeries.__class__.__module__,
-                RoiResponseSeries.__class__.__name__
-            )
+                    self.global_dict_image_metadata = {}
+                    self.global_dict_image_metadata["nwb_neurodata_type"] = (
+                        RoiResponseSeries.__class__.__module__,
+                        RoiResponseSeries.__class__.__name__
+                    )
 
-            data_ROI = self._file.processing['ophys']['Fluorescence']['RoiResponseSeries'].data
-            
-            size_x = self._file.processing['ophys']['ImageSegmentation']['PlaneSegmentation'].image_mask.shape[1]
-            size_y = self._file.processing['ophys']['ImageSegmentation']['PlaneSegmentation'].image_mask.shape[2]
-            size = self._file.processing['ophys']['ImageSegmentation']['PlaneSegmentation'].image_mask.shape[0]
+                    data_ROI = self._file.processing['ophys']['Fluorescence']['RoiResponseSeries'].data
+                    
+                    size_x = self._file.processing['ophys']['ImageSegmentation']['PlaneSegmentation'].image_mask.shape[1]
+                    size_y = self._file.processing['ophys']['ImageSegmentation']['PlaneSegmentation'].image_mask.shape[2]
+                    size = self._file.processing['ophys']['ImageSegmentation']['PlaneSegmentation'].image_mask.shape[0]
 
-            image_data_ROI=[[[column for column in range(size_x)]for row in range(size_y)] for frame in range(size)]
+                    image_data_ROI=[[[column for column in range(size_x)]for row in range(size_y)] for frame in range(size)]
 
-            # Roi Neo
-            width = self._file.processing['ophys']['ImageSegmentation']['PlaneSegmentation'].imaging_plane.grid_spacing[0] # Width (x-direction) of the ROI in pixels
-            height = self._file.processing['ophys']['ImageSegmentation']['PlaneSegmentation'].imaging_plane.grid_spacing[1] # Height (y-direction) of the ROI in pixels
-            # RectangularRegionOfInterest
-            rec_roi = RectangularRegionOfInterest(x=size_x, y=size_y, width=width, height=height)
+                    # Roi Neo
+                    width = self._file.processing['ophys']['ImageSegmentation']['PlaneSegmentation'].imaging_plane.grid_spacing[0] # Width (x-direction) of the ROI in pixels
+                    height = self._file.processing['ophys']['ImageSegmentation']['PlaneSegmentation'].imaging_plane.grid_spacing[1] # Height (y-direction) of the ROI in pixels
+                    # RectangularRegionOfInterest
+                    rec_roi = RectangularRegionOfInterest(x=size_x, y=size_y, width=width, height=height)
 
-            image_seq = ImageSequence(image_data_ROI, sampling_rate=sampling_rate * pq.Hz, spatial_scale=spatial_scale, units=units, **self.global_dict_image_metadata)
+                    image_seq = ImageSequence(image_data_ROI, sampling_rate=sampling_rate * pq.Hz, spatial_scale=spatial_scale, units=units, **self.global_dict_image_metadata)
 
-            #self._read_images(RoiResponseSeries, segment, lazy)
-#            segment.imagesequences.append(image_seq)
-#            image_seq.segment = seg
-#            result = image_seq.signal_from_region(rec_roi)
+                    #self._read_images(RoiResponseSeries, segment, lazy)
+        #            segment.imagesequences.append(image_seq)
+        #            image_seq.segment = seg
+        #            result = image_seq.signal_from_region(rec_roi)
 
 
     def _read_images(self, timeseries, segment, lazy):
@@ -483,7 +486,7 @@ class NWBIO(BaseIO):
                     dict_ImagePlan = {}
                     for iattr_imgPlan in attr_ImagePlan:
                         value_image_imgPlan = getattr(value_image,iattr_imgPlan)
-                        
+
                         if iattr_imgPlan=="optical_channel":
                             dict_optical = {}
                             for iattr_optical in attr_optical:
@@ -667,16 +670,14 @@ class NWBIO(BaseIO):
             if not signal.name:
                 signal.name = "%s : analogsignal%d %i" % (segment.name, i, i)
             self._write_signal(nwbfile, signal, electrodes)
-            self._write_fluorescence(nwbfile, signal)
 
         for i, image in enumerate(segment.imagesequences):
+#            print("segment.imagesequences = ", segment.imagesequences)
             #assert image.segment is segment
-            print("i = ", i)
             if not image.name:
                 image.name = "%s : image%d" % (segment.name, i)
             self._write_image(nwbfile, image)
-#            self._write_fluorescence(nwbfile, image)
-
+            #self._write_image(nwbfile, segment, image)
 
         for i, train in enumerate(segment.spiketrains):
             assert train.segment is segment
@@ -697,12 +698,16 @@ class NWBIO(BaseIO):
 
 
     def _write_image(self, nwbfile, image):
+#    def _write_image(self, nwbfile, segment, image):
         """
         Referring to ImageSequence for Neo
         and to ophys for pynwb
         """
         # Only TwoPhotonSeries with data as an array, not a picture file, is handle
-        image_sequence_data=np.array([image.shape[0], image.shape[1], image.shape[2]])
+        #image_sequence_data=np.array([image.shape[0], image.shape[1], image.shape[2]])
+        #print("image_sequence_data = ", image_sequence_data)
+        print("image = ", image)
+#        print("image.annotations = ", image.annotations)
 
         # Metadata and/or annotations from existing NWB files
         if "nwb_neurodata_type" in image.annotations:
@@ -737,9 +742,10 @@ class NWBIO(BaseIO):
                 rate=image.annotations['rate'], 
                 unit=image.annotations['unit']         
             )
+            ####nwbfile.add_acquisition(image_series)
 
-            nwbfile.add_acquisition(image_series)
-   
+            self._write_fluorescence(nwbfile, image, imaging_plane_Neo)
+
         else:
             # Metadata and/or annotations from a new NWB file created with Neo
             device_Neo = nwbfile.create_device(
@@ -775,7 +781,7 @@ class NWBIO(BaseIO):
                     indicator=image.annotations["imaging_plane_indicator"],
                     location=image.annotations["imaging_plane_location"],
                 )
-            
+
             image_series_Neo = TwoPhotonSeries(
                 name='name images_series_Neo %s' %image.name,
                 data=image,
@@ -783,81 +789,54 @@ class NWBIO(BaseIO):
                 rate=float(image.sampling_rate), #ImageSequence
             )
 
-            nwbfile.add_acquisition(image_series_Neo)
+        self._write_fluorescence(nwbfile, image, imaging_plane_Neo)
+        print("image end = ", image)
+        print("imaging_plane_Neo = ", imaging_plane_Neo)
+        #nwbfile.add_processing_module([imaging_plane_Neo])
 
 
-            ###
-            img_seg = ImageSegmentation()
+    def _write_fluorescence(self, nwbfile, image, imaging_plane_Neo):
 
-            ps = img_seg.create_plane_segmentation(
-                    name='name plane_segmentation Neo %s' %image.name, #PlaneSegmentation',
-                    description=image.description, #'output from segmenting my favorite imaging plane',
-                    imaging_plane=imaging_plane,
-                    #reference_images=image_series  # optional
-            )
-            ophys_module = nwbfile.create_processing_module(
-                    name='ophys', 
-                    description='optical physiology processed data'
-            )
-            print("ophys_module = ", ophys_module)
-            ophys_module.add(img_seg)
-
-            # Storing fluorescence measurements
-            rt_region = ps.create_roi_table_region(
-                    #region=[0,1], # optional ???
-                    description='the first of two ROIs'
-            )
-            roi_resp_series = RoiResponseSeries(
-                    name='RoiResponseSeries',
-                    data=np.ones((50,2)),  # 50 samples, 2 rois
-                    rois=rt_region,
-                    unit='lumens',
-                    rate=30.
-            )
-            fl = Fluorescence(roi_response_series=roi_resp_series)
-            print("fl = ", fl)
-            ophys_module.add(fl)
-            ###
-
-            nwbfile.add(fl) ###
-
-
-
-    def _write_fluorescence(self, nwbfile, image):
-        print("*** _write_fluorescence ***")
-        # Plane Segmentation
-        """
         img_seg = ImageSegmentation()
 
-        ps = img_seg.create_plane_segmentation(
-                name='name plane_segmentation Neo %s' %image.name, #PlaneSegmentation',
-                description=image.description, #'output from segmenting my favorite imaging plane',
-                imaging_plane=imaging_plane,
-                #reference_images=image_series  # optional
-        )
-        ophys_module = nwbfile.create_processing_module(
-                name='ophys', 
-                description='optical physiology processed data'
-        )
-        ophys_module.add(img_seg)
+        if "imaging_plane_description" not in image.annotations:
+            raise Exception("Please enter the description of the imaging plane with the name : imaging_plane_description")
+        else:
+            ps = img_seg.create_plane_segmentation(
+                            name='name plane_segmentation Neo %s' %image.name, #PlaneSegmentation',
+                            description=image.annotations["imaging_plane_description"], 
+                            imaging_plane=imaging_plane_Neo,
+                            #reference_images=image_series  # optional
+                )
+            ophys_module = nwbfile.create_processing_module(
+                        name='name processing_module %s' %image.name, #ophys 
+                        description='optical physiology processed data'
+            )
+            ophys_module.add(img_seg)
 
-        # Storing fluorescence measurements
-        rt_region = ps.create_roi_table_region(
-                #region=[0,1], # optional ???
-                description='the first of two ROIs'
-        )
-        roi_resp_series = RoiResponseSeries(
-                name='RoiResponseSeries',
-                data=np.ones((50,2)),  # 50 samples, 2 rois
-                rois=rt_region,
-                unit='lumens',
-                rate=30.
-        )
-        fl = Fluorescence(roi_response_series=roi_resp_series)
-#        ophys_module.add(fl)
-##        ophys_module.add_processing_module(fl)
-        ophys_module.add_processing(fl)
-        """
+            # Storing fluorescence measurements and ROIs
+            rt_region = ps.create_roi_table_region(
+                        #region=[0,1], # optional ???
+                        description='the first of two ROIs'
+            )
+            roi_resp_series = RoiResponseSeries(
+                        name='RoiResponseSeries',
+                        data=np.ones((50,2)),  # 50 samples, 2 rois
+                        rois=rt_region,
+                        unit='lumens',
+                        rate=30. # to do
+            )
+            ophys_module.add(roi_resp_series)
+
+            fl = Fluorescence(roi_response_series=roi_resp_series)
+            ophys_module.add(fl)
+            #print("fl = ", fl)
+        ###    nwbfile.add_processing_module([ophys_module])
+            nwbfile.add_acquisition((ophys_module))
+    ####        nwbfile.add_acquisition((image))
+        #    nwbfile.processing.add([ophys_module])
+            #ophys_module.add([image])
+            return ophys_module
 
 
     def _write_signal(self, nwbfile, signal, electrodes):
