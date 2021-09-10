@@ -53,7 +53,6 @@ try:
     from pynwb import NWBFile, TimeSeries, get_manager
     from pynwb.base import ProcessingModule
     from pynwb.ecephys import ElectricalSeries, Device, EventDetection
-    from pynwb.icephys import VoltageClampSeries, VoltageClampStimulusSeries, CurrentClampStimulusSeries, CurrentClampSeries, PatchClampSeries, SweepTable
     from pynwb.behavior import SpatialSeries
     from pynwb.misc import AnnotationSeries
     from pynwb import image
@@ -141,6 +140,7 @@ def statistics(block):  # todo: move this to be a property of Block
         "Epoch": {"count": 0},
         "Event": {"count": 0},
         "ImageSequence": {"count": 0},
+        "Fluorescence": {"count": 0},
     }
     for segment in block.segments:
         stats["SpikeTrain"]["count"] += len(segment.spiketrains)
@@ -149,6 +149,7 @@ def statistics(block):  # todo: move this to be a property of Block
         stats["Epoch"]["count"] += len(segment.epochs)
         stats["Event"]["count"] += len(segment.events)
         stats["ImageSequence"]["count"] += len(segment.imagesequences)
+        stats["Fluorescence"]["count"] += len(segment.imagesequences)
     return stats
 
 
@@ -266,7 +267,7 @@ class NWBIO(BaseIO):
 
     def read_all_blocks(self, lazy=False, **kwargs):
         """
-
+        Load all blocks in the files.
         """
         assert self.nwb_file_mode in ('r',)
         io = pynwb.NWBHDF5IO(self.filename, mode=self.nwb_file_mode)  # Open a file with NWBHDF5IO
@@ -405,6 +406,8 @@ class NWBIO(BaseIO):
             if 'ophys' not in self._file.processing:
                 pass
             else:
+                fluorescence = self._file.processing['ophys']['Fluorescence']
+
                 RoiResponseSeries = self._file.processing['ophys']['Fluorescence']['RoiResponseSeries']
 
                 if RoiResponseSeries.data:
@@ -413,8 +416,6 @@ class NWBIO(BaseIO):
                     sampling_rate = RoiResponseSeries.rate
                     if sampling_rate is None:
                         sampling_rate=1
-                    
-        #            seg = Segment(name='segment')
 
                     # processing_module for pynwb
                     attr_ImageSegmentation={"name", "image_mask", "pixel_mask", "description", "id", "imaging_plane", "reference_images"} # ImageSegmentation
@@ -443,10 +444,12 @@ class NWBIO(BaseIO):
 
                     image_seq = ImageSequence(image_data_ROI, sampling_rate=sampling_rate * pq.Hz, spatial_scale=spatial_scale, units=units, **self.global_dict_image_metadata)
 
-                    #self._read_images(RoiResponseSeries, segment, lazy)
-        #            segment.imagesequences.append(image_seq)
-        #            image_seq.segment = seg
-        #            result = image_seq.signal_from_region(rec_roi)
+                    block_name="default"
+                    segment_name="default"
+                    segment = self._get_segment(block_name, segment_name)
+                    segment.imagesequences.append(rec_roi)
+                    segment.imagesequences.append(fluorescence)
+                    image_seq.segment = segment
 
 
     def _read_images(self, timeseries, segment, lazy):
@@ -463,7 +466,7 @@ class NWBIO(BaseIO):
             image_data=[[[column for column in range(size_x)]for row in range(size_y)] for frame in range(size)]
 
             spatial_scale_unit = timeseries.imaging_plane.grid_spacing_unit
-            spatial_scale='No spatial_scale'       #to do 
+            spatial_scale='No spatial_scale'       #todo
 
             attr_image={"name", "dimension", "external_file", "imaging_plane", "starting_frame", "format", "starting_time", "rate", "unit"} # TwoPhotonSeries
             attr_ImagePlan={"name", "optical_channel", "description", "device", "excitation_lambda", "imaging_rate", "indicator", "location", "reference_frame"}#, "grid_spacing"}
@@ -587,7 +590,6 @@ class NWBIO(BaseIO):
             # todo: concatenate descriptions of multiple blocks if different
         if "session_start_time" not in annotations:
             annotations["session_start_time"] = datetime.now()
-#            raise Exception("Writing to NWB requires an annotation 'session_start_time'")
 
         # todo: handle subject
         nwbfile = NWBFile(**annotations)
@@ -615,6 +617,7 @@ class NWBIO(BaseIO):
         io_nwb.write(nwbfile)
         io_nwb.close()
 
+        # pynwb validator
         io_validate = pynwb.NWBHDF5IO(self.filename, "r")
         errors = pynwb.validate(io_validate, namespace="core")
         if errors:
@@ -625,6 +628,7 @@ class NWBIO(BaseIO):
         """
         Write a Block to the file
             :param block: Block to be written
+            :param nwbfile: Representation of an NWB file
         """
         electrodes = self._write_electrodes(nwbfile, block)
         if not block.name:
@@ -636,7 +640,7 @@ class NWBIO(BaseIO):
             assert segment.block is block
             if not segment.name:
                 segment.name = "%s : segment%d" % (block.name, i)
-            ### assert image.segment is segment ###
+            ###assert image.segment is segment ###
             self._write_segment(nwbfile, segment, electrodes)
         self.blocks_written += 1
 
@@ -672,12 +676,10 @@ class NWBIO(BaseIO):
             self._write_signal(nwbfile, signal, electrodes)
 
         for i, image in enumerate(segment.imagesequences):
-#            print("segment.imagesequences = ", segment.imagesequences)
-            #assert image.segment is segment
+           # assert image.segment is segment ###
             if not image.name:
                 image.name = "%s : image%d" % (segment.name, i)
             self._write_image(nwbfile, image)
-            #self._write_image(nwbfile, segment, image)
 
         for i, train in enumerate(segment.spiketrains):
             assert train.segment is segment
@@ -698,17 +700,11 @@ class NWBIO(BaseIO):
 
 
     def _write_image(self, nwbfile, image):
-#    def _write_image(self, nwbfile, segment, image):
         """
         Referring to ImageSequence for Neo
         and to ophys for pynwb
         """
         # Only TwoPhotonSeries with data as an array, not a picture file, is handle
-        #image_sequence_data=np.array([image.shape[0], image.shape[1], image.shape[2]])
-        #print("image_sequence_data = ", image_sequence_data)
-        print("image = ", image)
-#        print("image.annotations = ", image.annotations)
-
         # Metadata and/or annotations from existing NWB files
         if "nwb_neurodata_type" in image.annotations:
 
@@ -724,7 +720,7 @@ class NWBIO(BaseIO):
                                 emission_lambda=image.annotations['imaging_plane']['optical_channel']['emission_lambda']
                             )
 
-            imaging_plane = nwbfile.create_imaging_plane(
+            imaging_plane_Neo = nwbfile.create_imaging_plane(
                             name=image.annotations['imaging_plane']['name'],
                             optical_channel=optical_channel,
                             imaging_rate=image.annotations['imaging_plane']['imaging_rate'],
@@ -738,13 +734,12 @@ class NWBIO(BaseIO):
             image_series = TwoPhotonSeries(
                 name=image.annotations['imaging_plane']['name'],
                 data=image,
-                imaging_plane=imaging_plane,
+                imaging_plane=imaging_plane_Neo,
                 rate=image.annotations['rate'], 
                 unit=image.annotations['unit']         
             )
-            ####nwbfile.add_acquisition(image_series)
 
-            self._write_fluorescence(nwbfile, image, imaging_plane_Neo)
+            self._write_fluorescence(nwbfile, image_series, imaging_plane_Neo)
 
         else:
             # Metadata and/or annotations from a new NWB file created with Neo
@@ -786,57 +781,47 @@ class NWBIO(BaseIO):
                 name='name images_series_Neo %s' %image.name,
                 data=image,
                 imaging_plane=imaging_plane_Neo,
-                rate=float(image.sampling_rate), #ImageSequence
+                rate=float(image.sampling_rate),
             )
 
-        self._write_fluorescence(nwbfile, image, imaging_plane_Neo)
-        print("image end = ", image)
-        print("imaging_plane_Neo = ", imaging_plane_Neo)
-        #nwbfile.add_processing_module([imaging_plane_Neo])
+            self._write_fluorescence(nwbfile, image_series_Neo, imaging_plane_Neo)
+
+        nwbfile.add_acquisition(image_series_Neo) ###
 
 
-    def _write_fluorescence(self, nwbfile, image, imaging_plane_Neo):
+    def _write_fluorescence(self, nwbfile, image_series_Neo, imaging_plane_Neo):
 
         img_seg = ImageSegmentation()
-
-        if "imaging_plane_description" not in image.annotations:
-            raise Exception("Please enter the description of the imaging plane with the name : imaging_plane_description")
-        else:
-            ps = img_seg.create_plane_segmentation(
-                            name='name plane_segmentation Neo %s' %image.name, #PlaneSegmentation',
-                            description=image.annotations["imaging_plane_description"], 
+        ps = img_seg.create_plane_segmentation(
+                            name='name plane_segmentation Neo %s' %image_series_Neo.name, #PlaneSegmentation',
+                            description='',
                             imaging_plane=imaging_plane_Neo,
-                            #reference_images=image_series  # optional
-                )
-            ophys_module = nwbfile.create_processing_module(
-                        name='name processing_module %s' %image.name, #ophys 
+            )
+        ophys_module = nwbfile.create_processing_module(
+                        name='name processing_module %s' %image_series_Neo.name, #ophys
                         description='optical physiology processed data'
             )
-            ophys_module.add(img_seg)
+        ophys_module.add(img_seg)
 
-            # Storing fluorescence measurements and ROIs
-            rt_region = ps.create_roi_table_region(
+        # Storing fluorescence measurements and ROIs
+        rt_region = ps.create_roi_table_region(  
                         #region=[0,1], # optional ???
-                        description='the first of two ROIs'
+                        description='the first of two ROIs',
             )
-            roi_resp_series = RoiResponseSeries(
+
+        roi_resp_series = RoiResponseSeries(
                         name='RoiResponseSeries',
                         data=np.ones((50,2)),  # 50 samples, 2 rois
                         rois=rt_region,
                         unit='lumens',
-                        rate=30. # to do
+                        rate=30. # todo
             )
-            ophys_module.add(roi_resp_series)
 
-            fl = Fluorescence(roi_response_series=roi_resp_series)
-            ophys_module.add(fl)
-            #print("fl = ", fl)
-        ###    nwbfile.add_processing_module([ophys_module])
-            nwbfile.add_acquisition((ophys_module))
-    ####        nwbfile.add_acquisition((image))
-        #    nwbfile.processing.add([ophys_module])
-            #ophys_module.add([image])
-            return ophys_module
+        fl = Fluorescence(roi_response_series=roi_resp_series)
+
+        ophys_module.add(fl)
+
+        nwbfile.add_acquisition(ophys_module) ###
 
 
     def _write_signal(self, nwbfile, signal, electrodes):
@@ -959,6 +944,10 @@ class AnalogSignalProxy(BaseAnalogSignalProxy):
     )
 
     def __init__(self, timeseries, nwb_group):
+        """
+            :param timeseries:
+            :param nwb_group:
+        """
         self._timeseries = timeseries
         self.units = timeseries.unit
         if timeseries.conversion:
@@ -1016,27 +1005,28 @@ class AnalogSignalProxy(BaseAnalogSignalProxy):
 
     def load(self, time_slice=None, strict_slicing=True):
         """
-        *Args*:
-            :time_slice: None or tuple of the time slice expressed with quantities.
+        Load AnalogSignalProxy args:
+            :param time_slice: None or tuple of the time slice expressed with quantities.
                             None is the entire signal.
-            :strict_slicing: True by default.
+            :param strict_slicing: True by default.
                 Control if an error is raised or not when one of the time_slice members
                 (t_start or t_stop) is outside the real time range of the segment.
         """
         i_start, i_stop, sig_t_start = None, None, self.t_start
         if time_slice:
-            i_start, i_stop, sig_t_start = self._time_slice_indices(time_slice,
-                                                                    strict_slicing=strict_slicing)
+            if self.sampling_rate is none:
+                i_start, i_stop = np.searchsorted(self._timeseries.timestamps, time_slice)
+            else:
+                i_start, i_stop, sig_t_start = self._time_slice_indices(
+                    time_slice, strict_slicing=strict_slicing)
             signal = self._timeseries.data[i_start: i_stop]
         else:            
             signal = self._timeseries.data[:]
             sig_t_start = self.t_start
-
         if self.annotations=={'nwb_sweep_number'}:
             sweep_number = self._timeseries.sweep_number
         else:
             sweep_table=None
-
         if self.sampling_rate is None:
             return IrregularlySampledSignal(
                         self._timeseries.timestamps[i_start:i_stop] * pq.s,
@@ -1049,6 +1039,7 @@ class AnalogSignalProxy(BaseAnalogSignalProxy):
                         array_annotations=None,
                         sweep_number=sweep_table,
                         **self.annotations)  # todo: timeseries.control / control_description
+        
         else:
             return AnalogSignal(
                         signal,
@@ -1065,6 +1056,10 @@ class AnalogSignalProxy(BaseAnalogSignalProxy):
 class EventProxy(BaseEventProxy):
 
     def __init__(self, timeseries, nwb_group):
+        """
+            :param timeseries:
+            :param nwb_group:
+        """
         self._timeseries = timeseries
         self.name = timeseries.name
         self.annotations = {"nwb_group": nwb_group}
@@ -1077,10 +1072,10 @@ class EventProxy(BaseEventProxy):
 
     def load(self, time_slice=None, strict_slicing=True):
         """
-        *Args*:
-            :time_slice: None or tuple of the time slice expressed with quantities.
+        Load EventProxy args:
+            :param time_slice: None or tuple of the time slice expressed with quantities.
                             None is the entire signal.
-            :strict_slicing: True by default.
+            :param strict_slicing: True by default.
                 Control if an error is raised or not when one of the time_slice members
                 (t_start or t_stop) is outside the real time range of the segment.
         """
@@ -1098,8 +1093,17 @@ class EventProxy(BaseEventProxy):
 
 class EpochProxy(BaseEpochProxy):
 
-    def __init__(self, epochs_table, epoch_name=None, index=None):
-        self._epochs_table = epochs_table
+    def __init__(self, time_intervals, epoch_name=None, index=None):    
+        """
+            :param time_intervals: An epochs table,
+                which is a specific TimeIntervals table that stores info about long periods
+            :param epoch_name: (str)
+                Name of the epoch object
+            :param index: (np.array, slice)
+                Slice object or array of bool values masking time_intervals to be used. In case of
+                an array it has to have the same shape as `time_intervals`.
+        """
+        self._time_intervals = time_intervals
         if index is not None:
             self._index = index
             self.shape = (index.sum(),)
@@ -1110,17 +1114,22 @@ class EpochProxy(BaseEpochProxy):
 
     def load(self, time_slice=None, strict_slicing=True):
         """
-        *Args*:
-            :time_slice: None or tuple of the time slice expressed with quantities.
-                            None is all of the intervals.
-            :strict_slicing: True by default.
-                Control if an error is raised or not when one of the time_slice members
-                (t_start or t_stop) is outside the real time range of the segment.
+        Load EpochProxy args:        
+            :param time_intervals: An epochs table,
+                which is a specific TimeIntervals table that stores info about long periods
+            :param epoch_name: (str)
+                Name of the epoch object
+            :param index: (np.array, slice)
+                Slice object or array of bool values masking time_intervals to be used. In case of
+                an array it has to have the same shape as `time_intervals`.
         """
-        start_times = self._epochs_table.start_time[self._index]
-        stop_times = self._epochs_table.stop_time[self._index]
-        durations = stop_times - start_times
-        labels = self._epochs_table.tags[self._index]
+        if time_slice:
+            raise NotImplementedError("todo")
+        else:
+            start_times = self._time_intervals.start_time[self._index]
+            stop_times = self._time_intervals.stop_time[self._index]
+            durations = stop_times - start_times
+            labels = self._time_intervals.tags[self._index]
 
         return Epoch(times=start_times * pq.s,
                      durations=durations * pq.s,
@@ -1131,6 +1140,11 @@ class EpochProxy(BaseEpochProxy):
 class SpikeTrainProxy(BaseSpikeTrainProxy):
 
     def __init__(self,  units_table, id):
+        """
+            :param units_table: A Units table
+            (see https://pynwb.readthedocs.io/en/stable/pynwb.misc.html#pynwb.misc.Units)
+            :param id: the cell/unit ID (integer)
+        """
         self._units_table = units_table
         self.id = id
         self.units = pq.s
@@ -1148,10 +1162,10 @@ class SpikeTrainProxy(BaseSpikeTrainProxy):
 
     def load(self, time_slice=None, strict_slicing=True):
         """
-        *Args*:
-            :time_slice: None or tuple of the time slice expressed with quantities.
+        Load SpikeTrainProxy args:
+            :param time_slice: None or tuple of the time slice expressed with quantities.
                             None is the entire spike train.
-            :strict_slicing: True by default.
+            :param strict_slicing: True by default.
                 Control if an error is raised or not when one of the time_slice members
                 (t_start or t_stop) is outside the real time range of the segment.
         """
@@ -1176,9 +1190,21 @@ class SpikeTrainProxy(BaseSpikeTrainProxy):
 
 class ImageSequenceProxy(BaseAnalogSignalProxy):
     def __init__(self, timeseries, nwb_group):
+        """
+            :param timeseries:
+            :param nwb_group:
+        """
         self._timeseries = timeseries
     
     def load(self, time_slice=None, strict_slicing=True):
+        """
+        Load ImageSequenceProxy args:
+            :param time_slice: None or tuple of the time slice expressed with quantities.
+                            None is the entire spike train.
+            :param strict_slicing: True by default.
+                Control if an error is raised or not when one of the time_slice members
+                (t_start or t_stop) is outside the real time range of the segment.
+        """
         if time_slice:
             i_start, i_stop, sig_t_start = self._time_slice_indices(time_slice, strict_slicing=strict_slicing)
             signal = self._timeseries.data[i_start: i_stop]
