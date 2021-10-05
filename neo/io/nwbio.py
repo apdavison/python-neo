@@ -89,6 +89,7 @@ GLOBAL_ANNOTATIONS = (
     "pharmacology", "protocol", "related_publications", "slices", "source_script",
     "source_script_file_name", "data_collection", "surgery", "virus", "stimulus_notes",
     "lab", "session_description",
+    "rec_datetime",
 )
 
 POSSIBLE_JSON_FIELDS = (
@@ -286,7 +287,7 @@ class NWBIO(BaseIO):
         if "session_start_time" in self.global_block_metadata:
             self.global_block_metadata["rec_datetime"] = self.global_block_metadata["session_start_time"]
         if "file_create_date" in self.global_block_metadata:
-            self.global_block_metadata["file_datetime"] = self.global_block_metadata["file_create_date"]
+            self.global_block_metadata["file_datetime"] = self.global_block_metadata["rec_datetime"]
 
         self._blocks = {}
         self._read_acquisition_group(lazy=lazy)
@@ -589,7 +590,10 @@ class NWBIO(BaseIO):
             annotations["session_description"] = blocks[0].description or self.filename
             # todo: concatenate descriptions of multiple blocks if different
         if "session_start_time" not in annotations:
-            annotations["session_start_time"] = datetime.now()
+            annotations["session_start_time"] = blocks[0].rec_datetime
+
+        self.annotations = {"rec_datetime": "rec_datetime"}        
+        self.annotations["rec_datetime"] = blocks[0].rec_datetime
 
         # todo: handle subject
         nwbfile = NWBFile(**annotations)
@@ -671,6 +675,7 @@ class NWBIO(BaseIO):
         # maybe use NWB trials to store Segment metadata?
         for i, signal in enumerate(chain(segment.analogsignals, segment.irregularlysampledsignals)):
             assert signal.segment is segment
+            signal.name = "%s %s" % (signal.name, segment.name)
             if not signal.name:
                 signal.name = "%s : analogsignal%d %i" % (segment.name, i, i)
             self._write_signal(nwbfile, signal, electrodes)
@@ -689,6 +694,7 @@ class NWBIO(BaseIO):
                 
         for i, event in enumerate(segment.events):
             assert event.segment is segment
+            event.name = "%s  %s" % (event.name, segment.name)
             if not event.name:                
                 event.name = "%s : event%d" % (segment.name, i)
             self._write_event(nwbfile, event)
@@ -940,7 +946,8 @@ class AnalogSignalProxy(BaseAnalogSignalProxy):
     common_metadata_fields = (
         # fields that are the same for all TimeSeries subclasses
         "comments", "description", "unit", "starting_time", "timestamps", "rate",
-        "data", "starting_time_unit", "timestamps_unit", "electrode"
+        "data", "starting_time_unit", "timestamps_unit", "electrode",
+        "stream_id",
     )
 
     def __init__(self, timeseries, nwb_group):
@@ -985,7 +992,7 @@ class AnalogSignalProxy(BaseAnalogSignalProxy):
             timeseries.__class__.__module__,
             timeseries.__class__.__name__
         )
-        
+
         if hasattr(timeseries, "electrode"):
             # todo: once the Group class is available, we could add electrode metadata
             #       to a Group containing all signals that share that electrode
