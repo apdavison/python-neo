@@ -38,7 +38,8 @@ class TestNWBIO(unittest.TestCase):
 ##         "/Users/legouee/Desktop/NWB/NWB_files/Allen_Institute/H19.28.012.11.05-2.nwb",
         #### "/Users/legouee/NWBwork/NeurodataWithoutBorders/nwb_tutorial/HCK09/ophys_tutorial.nwb",
         ## "/Users/legouee/Desktop/Example_NWB_Fluorescence_File.nwb",
-        "/Users/legouee/Desktop/ophys_tutorial.nwb",
+######        "/Users/legouee/Desktop/ophys_tutorial.nwb",
+        "/home/elodie/Bureau/H19.28.012.11.05-2.nwb",        
     ]
 
     def test_read(self):
