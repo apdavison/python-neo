@@ -677,7 +677,7 @@ class NWBIO(BaseIO):
         # maybe use NWB trials to store Segment metadata?
         for i, signal in enumerate(chain(segment.analogsignals, segment.irregularlysampledsignals)):
             assert signal.segment is segment
-            signal.name = "%s %s" % (signal.name, segment.name)
+            signal.name = "%s %s %i" % (signal.name, segment.name, i)
             if not signal.name:
                 signal.name = "%s : analogsignal%d %i" % (segment.name, i, i)
             self._write_signal(nwbfile, signal, electrodes)
@@ -696,7 +696,7 @@ class NWBIO(BaseIO):
                 
         for i, event in enumerate(segment.events):
             assert event.segment is segment
-            event.name = "%s  %s" % (event.name, segment.name)
+            event.name = "%s  %s %i" % (event.name, segment.name, i)
             if not event.name:                
                 event.name = "%s : event%d" % (segment.name, i)
             self._write_event(nwbfile, event)
