@@ -46,7 +46,7 @@ GLOBAL_ANNOTATIONS = (
 )
 
 POSSIBLE_JSON_FIELDS = (
-    "source_script", "description"
+    "source_script", "description", "notes"
 )
 
 prefix_map = {
@@ -253,6 +253,12 @@ class NWBIO(BaseIO):
         if "file_create_date" in self.global_block_metadata:
             self.global_block_metadata["file_datetime"] = self.global_block_metadata[
                 "rec_datetime"]
+        if "notes" in self.global_block_metadata and isinstance(self.global_block_metadata, dict):
+            self.global_block_metadata.update(self.global_block_metadata["notes"])
+            if "nwb_notes" in self.global_block_metadata:
+                self.global_block_metadata["notes"] = self.global_block_metadata.pop("nwb_notes")
+            else:
+                self.global_block_metadata.pop("notes")
 
         self._blocks = {}
         self._read_acquisition_group(lazy=lazy)
@@ -347,13 +353,13 @@ class NWBIO(BaseIO):
                 segment.events.append(event)
                 event.segment = segment
             elif timeseries.rate:  # AnalogSignal
-                signal = AnalogSignalProxy(timeseries, group_name)
+                signal = AnalogSignalProxy(timeseries, group_name, self._file.scratch)
                 if not lazy:
                     signal = signal.load()
                 segment.analogsignals.append(signal)
                 signal.segment = segment
             else:  # IrregularlySampledSignal
-                signal = AnalogSignalProxy(timeseries, group_name)
+                signal = AnalogSignalProxy(timeseries, group_name, self._file.scratch)
                 if not lazy:
                     signal = signal.load()
                 segment.irregularlysampledsignals.append(signal)
@@ -385,40 +391,53 @@ class NWBIO(BaseIO):
         self._read_timeseries_group("stimulus", lazy)
 
     def _build_global_annotations(self, blocks):
-        annotations = defaultdict(set)
-        for annotation_name in GLOBAL_ANNOTATIONS:
-            if annotation_name in self.annotations:
-                annotations[annotation_name] = self.annotations[annotation_name]
+        standard_annotations = defaultdict(set)  # NWB-supported annotations
+        additional_annotations = {}
+        for annotation_name, annotation_value in self.annotations.items():
+            if annotation_name in GLOBAL_ANNOTATIONS:
+                standard_annotations[annotation_name].add(annotation_value)
             else:
-                for block in blocks:
-                    if annotation_name in block.annotations:
-                        try:
-                            annotations[annotation_name].add(block.annotations[annotation_name])
-                        except TypeError:
-                            if annotation_name in POSSIBLE_JSON_FIELDS:
-                                encoded = json.dumps(block.annotations[annotation_name])
-                                annotations[annotation_name].add(encoded)
-                            else:
-                                raise
-                if annotation_name in annotations:
-                    if len(annotations[annotation_name]) > 1:
-                        raise NotImplementedError(
-                            "We don't yet support multiple values for {}".format(annotation_name))
-                    # take single value from set
-                    annotations[annotation_name], = annotations[annotation_name]
+                additional_annotations[annotation_name] = annotation_value
+        for block in blocks:
+            for annotation_name, annotation_value in block.annotations.items():
+                if annotation_name in GLOBAL_ANNOTATIONS:
+                    try:
+                        standard_annotations[annotation_name].add(annotation_value)
+                    except TypeError:
+                        if annotation_name in POSSIBLE_JSON_FIELDS:
+                            encoded = json.dumps(annotation_value)
+                            standard_annotations[annotation_name].add(encoded)
+                        else:
+                            raise
+                else:
+                    additional_annotations[annotation_name] = annotation_value
 
-        if "identifier" not in annotations:
-            annotations["identifier"] = str(self.filename)
-        if "session_description" not in annotations:
-            annotations["session_description"] = blocks[0].description or str(self.filename)
+        for annotation_name in standard_annotations:
+            if len(standard_annotations[annotation_name]) > 1:
+                raise NotImplementedError(
+                    "We don't yet support multiple values for {}".format(annotation_name))
+            # take single value from set
+            standard_annotations[annotation_name], = standard_annotations[annotation_name]
+
+        if "identifier" not in standard_annotations:
+            standard_annotations["identifier"] = str(self.filename)
+        if "session_description" not in standard_annotations:
+            standard_annotations["session_description"] = blocks[0].description or str(self.filename)
             # need to use str() here because self.filename may be a pathlib path object
             # todo: concatenate descriptions of multiple blocks if different
-        if annotations.get("session_start_time", None) is None:
-            if "rec_datetime" in annotations:
-                annotations["session_start_time"] = annotations["rec_datetime"]
+        if standard_annotations.get("session_start_time", None) is None:
+            if "rec_datetime" in standard_annotations:
+                standard_annotations["session_start_time"] = standard_annotations["rec_datetime"]
             else:
                 raise Exception("Writing to NWB requires an annotation 'session_start_time'")
-        return annotations
+
+        # we don't have a good place to put non-standard annotations, so we abuse the NWB "notes" field
+        if additional_annotations:
+            if "notes" in standard_annotations:
+                additional_annotations["nwb_notes"] = standard_annotations["notes"]
+            standard_annotations["notes"] = json.dumps(additional_annotations, indent=2)
+
+        return standard_annotations
 
     def write_all_blocks(self, blocks, validate=True, **kwargs):
         """
@@ -550,17 +569,23 @@ class NWBIO(BaseIO):
             timeseries_class = get_class(*signal.annotations["nwb_neurodata_type"])
         else:
             timeseries_class = pynwb.TimeSeries  # default
-        additional_metadata = {name[4:]: value
-                               for name, value in signal.annotations.items()
-                               if name.startswith("nwb:")}
+        standard_metadata = {name[4:]: value
+                             for name, value in signal.annotations.items()
+                             if name.startswith("nwb:")}
         if "nwb_electrode" in signal.annotations:
-            electrode_name = signal.annotations["nwb_electrode"]["name"]
-            additional_metadata["electrode"] = electrodes[electrode_name]
+            electrode_name = signal.annotations.pop("nwb_electrode")["name"]
+            standard_metadata["electrode"] = electrodes[electrode_name]
         if timeseries_class != pynwb.TimeSeries:
             conversion, units = get_units_conversion(signal, timeseries_class)
-            additional_metadata["conversion"] = conversion
+            standard_metadata["conversion"] = conversion
         else:
             units = signal.units
+        additional_metadata = {
+            name: value for name, value in signal.annotations.items()
+            if not name.startswith("nwb:")
+        }
+        additional_metadata.update(hierarchy)
+
         if hasattr(signal, 'proxy_for') and signal.proxy_for in [AnalogSignal,
                                                                  IrregularlySampledSignal]:
             signal = signal.load()
@@ -572,17 +597,16 @@ class NWBIO(BaseIO):
                 data=signal,
                 unit=units.dimensionality.string,
                 rate=float(sampling_rate),
-                comments=json.dumps(hierarchy),
-                **additional_metadata)
-            # todo: try to add array_annotations via "control" attribute
+                comments=json.dumps(additional_metadata),
+                **standard_metadata)
         elif isinstance(signal, IrregularlySampledSignal):
             tS = timeseries_class(
                 name=signal.name,
                 data=signal,
                 unit=units.dimensionality.string,
                 timestamps=signal.times.rescale('second').magnitude,
-                comments=json.dumps(hierarchy),
-                **additional_metadata)
+                comments=json.dumps(additional_metadata),
+                **standard_metadata)
         else:
             raise TypeError(
                 "signal has type {0}, should be AnalogSignal or IrregularlySampledSignal".format(
@@ -597,6 +621,13 @@ class NWBIO(BaseIO):
         else:
             raise NotImplementedError("NWB group '{}' not yet supported".format(nwb_group))
         add_time_series(tS)
+
+        if signal.array_annotations:
+            for name, value in signal.array_annotations.items():
+                self._nwbfile.add_scratch(value,
+                                          name=f"{signal.name}__{name}",
+                                          description=f"Array annotation '{name}' for signal '{signal.name}'")
+
         return tS
 
     def _write_spiketrain(self, nwbfile, spiketrain):
@@ -658,8 +689,9 @@ class AnalogSignalProxy(BaseAnalogSignalProxy):
         "stream_id",
     )
 
-    def __init__(self, timeseries, nwb_group):
+    def __init__(self, timeseries, nwb_group, scratch=None):
         self._timeseries = timeseries
+        self.scratch = scratch  # currently used for array annotations
         self.units = timeseries.unit
         if timeseries.conversion:
             self.units = _recompose_unit(timeseries.unit, timeseries.conversion)
@@ -713,6 +745,13 @@ class AnalogSignalProxy(BaseAnalogSignalProxy):
                     electrode_metadata["device"][field_name] = value
             self.annotations["nwb_electrode"] = electrode_metadata
 
+        try:
+            additional_annotations = json.loads(timeseries.comments)
+        except JSONDecodeError:
+            pass
+        else:
+            self.annotations.update(additional_annotations)
+
     def load(self, time_slice=None, strict_slicing=True):
         """
         Load AnalogSignalProxy args:
@@ -730,6 +769,16 @@ class AnalogSignalProxy(BaseAnalogSignalProxy):
                 i_start, i_stop, sig_t_start = self._time_slice_indices(
                     time_slice, strict_slicing=strict_slicing)
         signal = self._timeseries.data[i_start: i_stop]
+
+        scratch_keys = []
+        for key in self.scratch.keys():
+            if key.startswith(self.name):
+                scratch_keys.append(key)
+        array_annotations = {}
+        for key in scratch_keys:
+            annotation_name = key.split("__")[1]
+            array_annotations[annotation_name] = self.scratch[key].data[:]
+
         if self.sampling_rate is None:
             return IrregularlySampledSignal(
                 self._timeseries.timestamps[i_start:i_stop] * pq.s,
@@ -739,9 +788,8 @@ class AnalogSignalProxy(BaseAnalogSignalProxy):
                 sampling_rate=self.sampling_rate,
                 name=self.name,
                 description=self.description,
-                array_annotations=None,
-                **self.annotations)  # todo: timeseries.control / control_description
-
+                array_annotations=array_annotations,
+                **self.annotations)
         else:
             return AnalogSignal(
                 signal,
@@ -750,8 +798,8 @@ class AnalogSignalProxy(BaseAnalogSignalProxy):
                 sampling_rate=self.sampling_rate,
                 name=self.name,
                 description=self.description,
-                array_annotations=None,
-                **self.annotations)  # todo: timeseries.control / control_description
+                array_annotations=array_annotations,
+                **self.annotations)
 
 
 class EventProxy(BaseEventProxy):
