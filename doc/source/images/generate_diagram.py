@@ -73,7 +73,7 @@ def generate_diagram(rect_pos, rect_width, figsize):
     alpha = [1., 1., 0.3]
     for name, pos in rect_pos.items():
         obj = objs[name]
-        relationships = [getattr(obj, '_single_child_objects', [])]
+        relationships = [getattr(obj, '_child_objects', [])]
 
         for r in range(3):
             for ch_name in relationships[r]:
@@ -98,7 +98,7 @@ def generate_diagram(rect_pos, rect_width, figsize):
     for name, pos in rect_pos.items():
         htotal = all_h[name]
         obj = objs[name]
-        allrelationship = list(getattr(obj, '_child_containers', []))
+        allrelationship = list(getattr(obj, '_container_names', []))
 
         rect = Rectangle(pos, rect_width, htotal,
                          facecolor='w', edgecolor='k', linewidth=2.)

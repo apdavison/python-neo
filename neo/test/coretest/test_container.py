@@ -68,7 +68,6 @@ class TestContainerNeo(unittest.TestCase):
         self.assertEqual(container._child_objects, ())
         self.assertEqual(container._child_containers, ())
 
-        self.assertEqual(container._single_children, ())
         self.assertEqual(container.data_children, ())
         self.assertEqual(container.container_children, ())
         self.assertEqual(container.children, ())

@@ -120,16 +120,11 @@ class Container(BaseNeo):
         :_child_objects: All neo objects that can be children of this object.
                                 :_container_child_objects: +
                                 :_data_child_objects:
-        :_container_child_containers: The names of the container attributes
+        :_container_child_containers: The container attributes
                                       used to store :_container_child_objects:
-        :_data_child_containers: The names of the container attributes used
+        :_data_child_containers: The container attributes used
                                  to store :_data_child_objects:
-        :_single_child_containers: The names of the container attributes used
-                                   to store :_single_child_objects:
-        :_child_containers: All child container attributes. Same as :_single_child_containers:
-        :_single_children: All objects that are children of the current object
-                           where the child can only have one parent of
-                           this type.
+        :_child_containers: All child container attributes.
         :data_children: All data objects that are children of
                         the current object.
         :container_children: All container objects that are children of
@@ -225,38 +220,34 @@ class Container(BaseNeo):
         return self._container_child_objects + self._data_child_objects
 
     @property
+    def _container_names(self):
+        """
+
+        """
+        return tuple(_container_name(child) for child in self._child_objects)
+
+    @property
     def _container_child_containers(self):
         """
-        Containers for child objects that are a container and
-        have a single parent.
+        Containers (ObjectLists) for child objects that are a container.
         """
-        return tuple([_container_name(child) for child in
-                      self._container_child_objects])
+        return tuple([getattr(self, _container_name(child))
+                     for child in self._container_child_objects])
 
     @property
     def _data_child_containers(self):
         """
-        Containers for child objects that have data and have a single parent.
+        Containers (ObjectLists) for child objects that have data.
         """
-        return tuple([_container_name(child) for child in
-                      self._data_child_objects])
+        return tuple([getattr(self, _container_name(child))
+                     for child in self._data_child_objects])
 
     @property
     def _child_containers(self):
         """
-        Containers for child objects with a single parent.
+        Containers (ObjectLists) for all child objects.
         """
-        return tuple([_container_name(child) for child in
-                      self._child_objects])
-
-    @property
-    def _single_children(self):
-        """
-        All child objects that can only have single parents.
-        """
-        childs = [list(getattr(self, attr)) for attr in
-                  self._child_containers]
-        return tuple(sum(childs, []))
+        return self._container_child_containers + self._data_child_containers
 
     @property
     def data_children(self):
@@ -264,9 +255,7 @@ class Container(BaseNeo):
         All data child objects stored in the current object.
         Not recursive.
         """
-        childs = [list(getattr(self, attr)) for attr in
-                  self._data_child_containers]
-        return tuple(sum(childs, []))
+        return tuple(sum(self._data_child_containers, []))
 
     @property
     def container_children(self):
@@ -274,9 +263,7 @@ class Container(BaseNeo):
         All container child objects stored in the current object.
         Not recursive.
         """
-        childs = [list(getattr(self, attr)) for attr in
-                  self._container_child_containers]
-        return tuple(sum(childs, []))
+        return tuple(sum(self._container_child_containers, []))
 
     @property
     def children(self):
@@ -320,8 +307,10 @@ class Container(BaseNeo):
         Get dictionary containing the names of child containers in the current
         object as keys and the number of children of that type as values.
         """
-        return {name: len(getattr(self, name))
-                    for name in self._child_containers}
+        return {
+            name: len(container)
+            for name, container in zip(self._container_names, self._child_containers)
+        }
 
     def filter(self, targdict=None, data=True, container=False, recursive=True,
                objects=None, **kwargs):
@@ -405,7 +394,7 @@ class Container(BaseNeo):
         Check that the expected child-parent relationships exist.
         """
         parent_name = _reference_name(self.__class__.__name__)
-        for child in self._single_children:
+        for child in self.children:
             assert getattr(child, parent_name, None) is self
         if recursive:
             for child in self.container_children:
@@ -422,7 +411,7 @@ class Container(BaseNeo):
         relationships there
         """
         parent_name = _reference_name(self.__class__.__name__)
-        for child in self._single_children:
+        for child in self.children:
             if (hasattr(child, parent_name) and
                         getattr(child, parent_name) is None or force):
                 setattr(child, parent_name, self)
@@ -472,10 +461,12 @@ class Container(BaseNeo):
         after the merge operation and should not be used further.
         """
         # merge containers with the same name
-        for container in self._container_child_containers:
-            lookup = {obj.name: obj for obj in getattr(self, container)}
-            ids = [id(obj) for obj in getattr(self, container)]
-            for obj in getattr(other, container):
+        for this_container, other_container in zip(
+            self._container_child_containers, other._container_child_containers
+        ):
+            lookup = {obj.name: obj for obj in this_container}
+            ids = [id(obj) for obj in this_container]
+            for obj in other_container:
                 if id(obj) in ids:
                     continue
                 if obj.name in lookup:
@@ -483,28 +474,29 @@ class Container(BaseNeo):
                 else:
                     lookup[obj.name] = obj
                     ids.append(id(obj))
-                    getattr(self, container).append(obj)
+                    this_container.append(obj)
 
         # for data objects, ignore the name and just add them
-        for container in self._data_child_containers:
-            objs = getattr(self, container)
-            lookup = {obj.name: i for i, obj in enumerate(objs)}
-            ids = [id(obj) for obj in objs]
-            for obj in getattr(other, container):
+        for this_container, other_container in zip(
+            self._data_child_containers, other._data_child_containers
+        ):
+            lookup = {obj.name: i for i, obj in enumerate(this_container)}
+            ids = [id(obj) for obj in this_container]
+            for obj in other_container:
                 if id(obj) in ids:
                     pass
                 elif hasattr(obj, 'merge') and obj.name is not None and obj.name in lookup:
                     ind = lookup[obj.name]
                     try:
-                        newobj = getattr(self, container)[ind].merge(obj)
-                        getattr(self, container)[ind] = newobj
+                        newobj = getattr(self, this_container)[ind].merge(obj)
+                        getattr(self, this_container)[ind] = newobj
                     except NotImplementedError:
-                        getattr(self, container).append(obj)
+                        getattr(self, this_container).append(obj)
                         ids.append(id(obj))
                 else:
                     lookup[obj.name] = obj
                     ids.append(id(obj))
-                    getattr(self, container).append(obj)
+                    this_container.append(obj)
                 obj.set_parent(self)
 
         # use the BaseNeo merge as well
@@ -520,7 +512,7 @@ class Container(BaseNeo):
         vals = []
         for container in self._child_containers:
             objs = getattr(self, container)
-            if objs:
+            if container:
                 vals.append('{} {}'.format(len(objs), container))
         pp.text(', '.join(vals))
 

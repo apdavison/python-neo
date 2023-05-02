@@ -137,8 +137,8 @@ class Group(Container):
     @property
     def _container_lookup(self):
         return {
-            cls_name: getattr(self, container_name)
-            for cls_name, container_name in zip(self._child_objects, self._child_containers)
+            cls_name: container
+            for cls_name, container in zip(self._child_objects, self._child_containers)
         }
 
     def _get_container(self, cls):
