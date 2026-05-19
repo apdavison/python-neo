@@ -87,6 +87,7 @@ Neo documentation
    releases
    authors
    governance
+   maintenance
 
 
 .. grid::

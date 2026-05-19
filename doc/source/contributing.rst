@@ -283,15 +283,32 @@ Some guidelines on writing tests:
 Coding standards and style
 ==========================
 
-All code should conform as much as possible to `PEP 8`_, with a maximum line length of 99 characters,
-and should run with Python 3.8 or newer.
+Code targets Python 3.10 or newer (see :file:`pyproject.toml` for the authoritative version
+requirement).
 
-You can use the `pep8`_ program to check the code for PEP 8 conformity.
-You can also use `flake8`_, which combines pep8 and pyflakes.
+The conventions in use are:
 
-However, the pep8 and flake8 programs do not check for all PEP 8 issues.
-In particular, they do not check that the import statements are in the correct order
-(standard library imports first, then other dependencies, then Neo's own code).
+- **Formatter:** `Black`_ with a line length of 120, configured in :file:`pyproject.toml`.
+  A scheduled CI workflow checks formatting weekly and opens a pull request if anything
+  has drifted, so contributors do not strictly need to run Black themselves — but doing so
+  before committing avoids round-trips::
+
+      pip install black
+      black neo/
+
+- **Linter:** `ruff`_ runs in CI on every pull request. To reproduce the CI lint check
+  locally::
+
+      pip install ruff
+      ruff check .
+
+- **Docstrings:** `NumPy docstring style`_, as used throughout :mod:`neo.core`.
+
+- **Type hints:** optional, but encouraged for new code. There is no requirement to add
+  type hints to existing code.
+
+- **Import order:** standard-library imports first, then third-party imports, then
+  :mod:`neo.*` imports. ruff enforces this through its import-sorting rules.
 
 
 Working on the documentation
@@ -299,7 +316,8 @@ Working on the documentation
 
 All modules, classes, functions, and methods (including private and subclassed
 builtin methods) should have docstrings.
-Please see `PEP 257`_ for a description of docstring conventions.
+Docstrings follow the `NumPy docstring style`_; see :pep:`257` for the general docstring
+conventions Python expects.
 
 Module docstrings should explain briefly what functions or classes are present.
 Detailed descriptions can be left for the docstrings of the respective
@@ -435,28 +453,10 @@ and seeing the big picture.
 Making a release
 ================
 
-- Create a new file with the release notes in the folder :file:`doc/source/releases`
-  then add a link to it in :file:`/doc/source/releases.rst`.
-- Ensure you are in the master branch.
-- Check that all tests pass, and that the documentation builds correctly (see above).
-- Tag the release in the Git repository and push it::
-
-    git tag <version>
-    git push --tags origin
-    git push --tags upstream
-
-- Wait for the `continuous integration server`_ to run all the tests, ensure there are
-  no failures. If there are failures, fix them, and move the tag to the new commit.
-- Build source and wheel packages::
-
-    python -m build
-
-- Upload the package to `PyPI`_ (the members of the :ref:`section-maintainers` team have the necessary permissions to do this)::
-
-    twine upload dist/neo-0.X.Y.tar.gz
-
-- Check the `Read the Docs`_ documentation has built correctly.
-  If not, you may need to manually activate the new version in the `docs configuration page`_.
+The release procedure (tagging, triggering the PyPI publish workflow, updating the EBRAINS
+spack recipe, verifying the Read the Docs build) is documented in
+:ref:`section-release-process` on the :doc:`maintenance` page, along with the project's
+:ref:`section-versioning` and :ref:`deprecation policy <section-deprecation-policy>`.
 
 
 .. _`mailing list`: http://neuralensemble.org/community
@@ -468,14 +468,11 @@ Making a release
 .. _Miniconda: https://docs.conda.io/en/latest/miniconda.html
 .. _Datalad: https://www.datalad.org
 .. _`installing Datalad`: https://handbook.datalad.org/en/latest/intro/installation.html#installation-and-configuration
-.. _pep8: https://pypi.org/project/pep8/
-.. _flake8: https://pypi.org/project/flake8/
-.. _pyflakes: https://pypi.org/project/pyflakes/
+.. _Black: https://black.readthedocs.io
+.. _ruff: https://docs.astral.sh/ruff/
+.. _`NumPy docstring style`: https://numpydoc.readthedocs.io/en/latest/format.html
 .. _reStructuredText: http://docutils.sourceforge.net/rst.html
 .. _Sphinx: http://www.sphinx-doc.org/
-.. _`PEP 257`: https://www.python.org/dev/peps/pep-0257/
-.. _`PEP 8`: https://www.python.org/dev/peps/pep-0008/
-.. _pep8: https://pypi.org/project/pep8/
 .. _`Blischak, Davenport and Wilson (2016)`: https://doi.org/10.1371/journal.pcbi.1004668
 .. _`this document by Luis Matos`: https://gist.github.com/luismts/
 .. _`staging area`: https://coderefinery.github.io/git-intro/staging-area/
@@ -484,8 +481,4 @@ Making a release
 .. _`open a pull request on GitHub`: https://help.github.com/en/articles/about-pull-requests
 .. _`Code of Conduct`: https://github.com/NeuralEnsemble/python-neo/blob/master/CODE_OF_CONDUCT.md
 .. _`maintainers team`: https://github.com/orgs/NeuralEnsemble/teams/neo-maintainers
-.. _PyPI: https://pypi.org/project/neo
-.. _`continuous integration server`: https://github.com/NeuralEnsemble/python-neo/actions
-.. _`Read the Docs`: https://neo.readthedocs.io/en/latest/
-.. _`docs configuration page`: https://readthedocs.org/projects/neo/
 .. _`conda env vars documentation`: https://conda.io/projects/conda/en/latest/user-guide/tasks/manage-environments.html#activating-an-environment
